@@ -896,13 +896,13 @@
 
 <script>
 /* ── SUPABASE CONFIG ── */
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = 'https://zeytwxrugoketlirwbtw.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao';
 
 let supabaseClient = null;
 
 function initSupabase() {
-  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+  if (SUPABASE_URL === 'https://zeytwxrugoketlirwbtw.supabase.co/rest/v1/') {
     setStatus('⚠ Supabase не настроен — укажите URL и KEY в index.html', 'err');
     renderMockData();
     return;
