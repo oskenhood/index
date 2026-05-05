@@ -934,12 +934,14 @@ let supabaseClient = null;
 
 function initSupabase() {
   try {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient = supabase.createClient(https://zeytwxrugoketlirwbtw.supabase.co, eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao);
     setStatus('✦ Соединение установлено', 'ok');
     loadEmployees();
+    loadEmployeesForDocs()
   } catch(e) {
     setStatus('✕ Ошибка подключения: ' + e.message, 'err');
     renderMockData();
+    loadEmployeesForDocs()
   }
 }
 
@@ -1105,6 +1107,244 @@ document.querySelectorAll('#salary,#worked_days,#work_days,#overtime,#night,#nor
   .forEach(el => el.addEventListener('input', calculate));
 
 initSupabase();
+  /* ── ЗАГРУЗКА СОТРУДНИКОВ В СЕЛЕКТ ДОКУМЕНТОВ ── */
+async function loadEmployeesForDocs() {
+  let employees = [];
+  if (supabaseClient) {
+    const { data } = await supabaseClient.from('employees').select('id,full_name').order('full_name');
+    if (data) employees = data;
+  } else {
+    employees = MOCK.map((e, i) => ({ id: String(i), full_name: e.full_name }));
+  }
+  const sel = document.getElementById('doc-employee');
+  sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
+}
+
+/* ── СКАЧАТЬ HTML КАК ФАЙЛ ── */
+function downloadHtml(content, filename) {
+  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function docStatus(msg) {
+  document.getElementById('doc-status').textContent = msg;
+}
+
+/* ── СОЗДАТЬ ТАБЕЛЬ (Форма Т-13) ── */
+async function createTimesheet() {
+  const empId   = document.getElementById('doc-employee').value;
+  const empName = document.getElementById('doc-employee').selectedOptions[0].text;
+  const month   = +document.getElementById('doc-month').value;
+  const year    = +document.getElementById('doc-year').value;
+  const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
+
+  docStatus('⟳ Формирование табеля...');
+
+  // Берём данные табеля из Supabase (если есть)
+  let ts = null;
+  if (supabaseClient) {
+    const { data } = await supabaseClient.from('timesheets')
+      .select('*')
+      .eq('employee_id', empId)
+      .eq('period_year', year)
+      .eq('period_month', month)
+      .single();
+    ts = data;
+  }
+
+  // Дней в месяце
+  const daysInMonth = new Date(year, month, 0).getDate();
+  // Заглушка если данных нет
+  const worked  = ts?.worked_days  ?? 21;
+  const normDay = ts?.work_days    ?? 21;
+  const overtime = ts?.overtime_hrs ?? 0;
+  const night    = ts?.night_hrs    ?? 0;
+  const sick     = ts?.sick_days    ?? 0;
+  const vacation = ts?.vacation_days ?? 0;
+
+  // Таблица дней месяца
+  let daysRow1 = '', daysRow2 = '', marksRow1 = '', marksRow2 = '';
+  for (let d = 1; d <= Math.min(daysInMonth, 16); d++) {
+    daysRow1 += `<td>${d}</td>`;
+    marksRow1 += `<td>Я</td>`;
+  }
+  for (let d = 17; d <= daysInMonth; d++) {
+    daysRow2 += `<td>${d}</td>`;
+    marksRow2 += `<td>Я</td>`;
+  }
+
+  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<title>Табель ${empName} ${monthName} ${year}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #000; }
+  h2 { text-align: center; font-size: 13px; margin-bottom: 4px; }
+  .sub { text-align: center; font-size: 11px; margin-bottom: 16px; color: #333; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+  td, th { border: 1px solid #000; padding: 4px 6px; text-align: center; font-size: 10px; }
+  th { background: #f0f0f0; }
+  .info-table td { border: none; border-bottom: 1px solid #000; padding: 3px 8px; text-align: left; }
+  .info-table td:first-child { color: #555; width: 180px; }
+  .sign { margin-top: 30px; display: flex; gap: 60px; }
+  .sign div { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 10px; color: #555; }
+</style></head><body>
+
+<h2>ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ</h2>
+<div class="sub">Форма № Т-13 · ООО «ТехноСервис»</div>
+
+<table class="info-table">
+  <tr><td>Сотрудник:</td><td><strong>${empName}</strong></td></tr>
+  <tr><td>Период:</td><td>${monthName} ${year} г.</td></tr>
+  <tr><td>Табельный номер:</td><td>${empId.slice(0,8).toUpperCase()}</td></tr>
+</table>
+
+<p style="margin:12px 0 4px;font-weight:bold;">1–16 число:</p>
+<table>
+  <tr><th>День</th>${daysRow1}</tr>
+  <tr><th>Отметка</th>${marksRow1}</tr>
+</table>
+
+<p style="margin:12px 0 4px;font-weight:bold;">17–${daysInMonth} число:</p>
+<table>
+  <tr><th>День</th>${daysRow2}</tr>
+  <tr><th>Отметка</th>${marksRow2}</tr>
+</table>
+
+<table>
+  <tr>
+    <th>Отработано дней</th><th>Норма дней</th>
+    <th>Сверхурочные, ч</th><th>Ночные, ч</th>
+    <th>Больничные, дн</th><th>Отпуск, дн</th>
+  </tr>
+  <tr>
+    <td>${worked}</td><td>${normDay}</td>
+    <td>${overtime}</td><td>${night}</td>
+    <td>${sick}</td><td>${vacation}</td>
+  </tr>
+</table>
+
+<p style="font-size:10px;color:#555;">Условные обозначения: Я — явка, Б — больничный, ОТ — отпуск, В — выходной, СВ — сверхурочные</p>
+
+<div class="sign">
+  <div>Ответственный за ведение табеля ___________________</div>
+  <div>Руководитель подразделения ___________________</div>
+  <div>Работник отдела кадров ___________________</div>
+</div>
+
+</body></html>`;
+
+  downloadHtml(html, `Табель_${empName.split(' ')[0]}_${monthName}_${year}.html`);
+  docStatus('✦ Табель сформирован и скачан');
+}
+
+/* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ ── */
+async function createPayslip() {
+  const empId   = document.getElementById('doc-employee').value;
+  const empName = document.getElementById('doc-employee').selectedOptions[0].text;
+  const month   = +document.getElementById('doc-month').value;
+  const year    = +document.getElementById('doc-year').value;
+  const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
+
+  docStatus('⟳ Формирование расчётного листа...');
+
+  let pr = null, emp = null;
+  if (supabaseClient) {
+    const [pRes, eRes] = await Promise.all([
+      supabaseClient.from('payroll').select('*')
+        .eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
+      supabaseClient.from('employees').select('*').eq('id', empId).single()
+    ]);
+    pr = pRes.data; emp = eRes.data;
+  }
+
+  // Заглушка если данных расчётного листа нет — считаем по окладу
+  const salary   = emp?.salary ?? 65000;
+  const base     = pr?.base_pay       ?? salary;
+  const overtime = pr?.overtime_pay   ?? 0;
+  const night    = pr?.night_pay      ?? 0;
+  const holiday  = pr?.holiday_pay    ?? 0;
+  const bonus    = pr?.bonus          ?? 0;
+  const sick     = pr?.sick_pay       ?? 0;
+  const vacation = pr?.vacation_pay   ?? 0;
+  const gross    = pr?.gross_total    ?? base;
+  const ndfl     = pr?.ndfl           ?? Math.round(gross * 0.13);
+  const deduct   = pr?.other_deductions ?? 0;
+  const net      = pr?.net_pay        ?? (gross - ndfl - deduct);
+  const insurance = pr?.insurance_total ?? Math.round(gross * 0.30);
+  const children = emp?.tax_children  ?? 0;
+  const childDed = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+
+  const r = n => Number(n).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<title>Расчётный лист ${empName} ${monthName} ${year}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #000; }
+  h2 { text-align: center; font-size: 13px; margin-bottom: 2px; }
+  .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
+  td, th { border: 1px solid #000; padding: 5px 8px; font-size: 11px; }
+  th { background: #f0f0f0; text-align: left; }
+  .amount { text-align: right; font-weight: bold; }
+  .total-row td { background: #f5f5f5; font-weight: bold; }
+  .net-row td { background: #1a1209; color: #fff; font-weight: bold; font-size: 12px; }
+  .info-table td { border: none; border-bottom: 1px solid #ddd; padding: 4px 8px; }
+  .info-table td:first-child { color: #555; width: 200px; }
+</style></head><body>
+
+<h2>РАСЧЁТНЫЙ ЛИСТ</h2>
+<div class="sub">ООО «ТехноСервис» · Форма, утверждённая ст. 136 ТК РФ</div>
+
+<table class="info-table">
+  <tr><td>Сотрудник:</td><td><strong>${empName}</strong></td></tr>
+  <tr><td>Должность:</td><td>${emp?.position ?? '—'}</td></tr>
+  <tr><td>Подразделение:</td><td>${emp?.department ?? '—'}</td></tr>
+  <tr><td>Расчётный период:</td><td>${monthName} ${year} г.</td></tr>
+  <tr><td>Оклад:</td><td>${r(salary)} руб.</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">НАЧИСЛЕНИЯ</th></tr>
+  <tr><td>Оплата по окладу (базовая)</td><td class="amount">${r(base)} ₽</td></tr>
+  ${overtime > 0 ? `<tr><td>Сверхурочные (ст. 152 ТК РФ)</td><td class="amount">${r(overtime)} ₽</td></tr>` : ''}
+  ${night    > 0 ? `<tr><td>Доплата за ночное время (ст. 154 ТК РФ)</td><td class="amount">${r(night)} ₽</td></tr>` : ''}
+  ${holiday  > 0 ? `<tr><td>Праздничные и выходные (ст. 153 ТК РФ)</td><td class="amount">${r(holiday)} ₽</td></tr>` : ''}
+  ${bonus    > 0 ? `<tr><td>Премия</td><td class="amount">${r(bonus)} ₽</td></tr>` : ''}
+  ${sick     > 0 ? `<tr><td>Пособие по нетрудоспособности</td><td class="amount">${r(sick)} ₽</td></tr>` : ''}
+  ${vacation > 0 ? `<tr><td>Отпускные</td><td class="amount">${r(vacation)} ₽</td></tr>` : ''}
+  <tr class="total-row"><td>ИТОГО НАЧИСЛЕНО (gross)</td><td class="amount">${r(gross)} ₽</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">УДЕРЖАНИЯ</th></tr>
+  <tr><td>Стандартный вычет на детей (${children} реб., ${r(childDed)} руб.)</td><td class="amount">${r(childDed)} ₽</td></tr>
+  <tr><td>НДФЛ 13% с налогооблагаемой базы</td><td class="amount">${r(ndfl)} ₽</td></tr>
+  ${deduct > 0 ? `<tr><td>Прочие удержания</td><td class="amount">${r(deduct)} ₽</td></tr>` : ''}
+  <tr class="total-row"><td>ИТОГО УДЕРЖАНО</td><td class="amount">${r(ndfl + deduct)} ₽</td></tr>
+</table>
+
+<table>
+  <tr class="net-row"><td>К ВЫПЛАТЕ (net)</td><td class="amount">${r(net)} ₽</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя, не удерживаются)</th></tr>
+  <tr><td>Взносы 30% (ОПС, ОМС, ОСС)</td><td class="amount">${r(insurance)} ₽</td></tr>
+</table>
+
+<p style="font-size:9px;color:#888;margin-top:20px;">
+  Расчётный лист сформирован автоматически ИС Учёта Труда · ООО «ТехноСервис» · ${new Date().toLocaleDateString('ru-RU')}
+</p>
+
+</body></html>`;
+
+  downloadHtml(html, `РасчётныйЛист_${empName.split(' ')[0]}_${monthName}_${year}.html`);
+  docStatus('✦ Расчётный лист сформирован и скачан');
+}
 </script>
 </body>
 </html>
