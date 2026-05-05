@@ -1128,8 +1128,9 @@ async function createTimesheet() {
   const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
   const month    = +document.getElementById('doc-month').value;
   const year     = +document.getElementById('doc-year').value;
-  const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
-                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
+  const monthNames = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                      'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const monthName = monthNames[month];
   docStatus('⟳ Формирование табеля...');
 
   let ts = null;
@@ -1151,65 +1152,232 @@ async function createTimesheet() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  // Заголовок
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ', 148, 15, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Форма № Т-13 · ООО «ТехноСервис»', 148, 22, { align: 'center' });
+  // Заголовок через autoTable (поддерживает кириллицу)
+  doc.autoTable({
+    startY: 10,
+    body: [
+      ['ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ'],
+      ['Форма № Т-13 · ООО «ТехноСервис»'],
+    ],
+    styles: { halign: 'center', fontSize: 13, fontStyle: 'bold' },
+    bodyStyles: { fillColor: [255, 255, 255], textColor: [26, 18, 9] },
+    didParseCell: d => { if (d.row.index === 1) { d.cell.styles.fontSize = 9; d.cell.styles.fontStyle = 'normal'; } },
+    theme: 'plain',
+  });
 
   // Инфо о сотруднике
-  doc.setFontSize(10);
-  doc.text(`Сотрудник: ${empName}`, 14, 32);
-  doc.text(`Период: ${monthName} ${year} г.`, 14, 38);
-  doc.text(`Табельный номер: ${empId.slice(0,8).toUpperCase()}`, 14, 44);
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 2,
+    body: [
+      ['Сотрудник:', empName, 'Период:', `${monthName} ${year} г.`, 'Таб. №:', empId.slice(0,8).toUpperCase()],
+    ],
+    styles: { fontSize: 9 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 25 },
+      2: { fontStyle: 'bold', cellWidth: 18 },
+      4: { fontStyle: 'bold', cellWidth: 16 },
+    },
+    theme: 'plain',
+  });
 
   // Таблица дней
-  const dayHeaders = [];
-  const dayMarks = [];
+  const dayHeaders = ['Отметка'];
+  const dayMarks = ['Я'];
   for (let d = 1; d <= daysInMonth; d++) {
     dayHeaders.push(String(d));
     dayMarks.push('Я');
   }
 
   doc.autoTable({
-    startY: 50,
-    head: [['', ...dayHeaders]],
-    body: [['Отметка', ...dayMarks]],
+    startY: doc.lastAutoTable.finalY + 2,
+    head: [dayHeaders],
+    body: [dayMarks],
     styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
     headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 20, halign: 'left', fontStyle: 'bold' } },
+    columnStyles: { 0: { cellWidth: 18, halign: 'left', fontStyle: 'bold' } },
     theme: 'grid',
   });
 
   // Итоговая таблица
   doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 6,
+    startY: doc.lastAutoTable.finalY + 4,
     head: [['Отработано дней', 'Норма дней', 'Сверхурочные, ч', 'Ночные, ч', 'Больничные, дн', 'Отпуск, дн']],
-    body: [[worked, normDay, overtime, night, sick, vacation]],
+    body: [[String(worked), String(normDay), String(overtime), String(night), String(sick), String(vacation)]],
     styles: { fontSize: 9, halign: 'center' },
     headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
     theme: 'grid',
   });
 
-  // Легенда и подписи
-  const y = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text('Условные обозначения: Я — явка, Б — больничный, ОТ — отпуск, В — выходной, СВ — сверхурочные', 14, y);
-  doc.setTextColor(0);
-  doc.setFontSize(9);
-  doc.text('Ответственный за ведение табеля: ____________________', 14, y + 12);
-  doc.text('Руководитель подразделения: ____________________', 100, y + 12);
-  doc.text('Работник отдела кадров: ____________________', 190, y + 12);
+  // Легенда и подписи через autoTable
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    body: [['Я — явка   Б — больничный   ОТ — отпуск   В — выходной   СВ — сверхурочные']],
+    styles: { fontSize: 7, textColor: [120, 120, 120] },
+    theme: 'plain',
+  });
 
-  doc.save(`Табель_${empName.split(' ')[0]}_${monthName}_${year}.pdf`);
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 2,
+    body: [[
+      'Ответственный за ведение табеля: ____________________',
+      'Руководитель подразделения: ____________________',
+      'Работник отдела кадров: ____________________',
+    ]],
+    styles: { fontSize: 8 },
+    theme: 'plain',
+  });
+
+  doc.save(`Tabel_${empName.split(' ')[0]}_${month}_${year}.pdf`);
   docStatus('✦ Табель сформирован и скачан');
 }
 
 /* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ (PDF) ── */
 async function createPayslip() {
+  const empId    = document.getElementById('doc-employee').value;
+  const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
+  const month    = +document.getElementById('doc-month').value;
+  const year     = +document.getElementById('doc-year').value;
+  const monthNames = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                      'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const monthName = monthNames[month];
+  docStatus('⟳ Формирование расчётного листа...');
+
+  let pr = null, emp = null;
+  if (supabaseClient) {
+    const [pRes, eRes] = await Promise.all([
+      supabaseClient.from('payroll').select('*')
+        .eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
+      supabaseClient.from('employees').select('*').eq('id', empId).single()
+    ]);
+    pr = pRes.data; emp = eRes.data;
+  }
+
+  const salary    = emp?.salary            ?? 65000;
+  const base      = pr?.base_pay           ?? salary;
+  const overtime  = pr?.overtime_pay       ?? 0;
+  const night     = pr?.night_pay          ?? 0;
+  const holiday   = pr?.holiday_pay        ?? 0;
+  const bonus     = pr?.bonus              ?? 0;
+  const sick      = pr?.sick_pay           ?? 0;
+  const vacation  = pr?.vacation_pay       ?? 0;
+  const gross     = pr?.gross_total        ?? base;
+  const ndfl      = pr?.ndfl               ?? Math.round(gross * 0.13);
+  const deduct    = pr?.other_deductions   ?? 0;
+  const net       = pr?.net_pay            ?? (gross - ndfl - deduct);
+  const insurance = pr?.insurance_total    ?? Math.round(gross * 0.30);
+  const children  = emp?.tax_children      ?? 0;
+  const childDed  = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+  const r = n => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' руб.';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Заголовок
+  doc.autoTable({
+    startY: 10,
+    body: [['РАСЧЁТНЫЙ ЛИСТ'], ['ООО «ТехноСервис» · ст. 136 ТК РФ']],
+    styles: { halign: 'center', fontSize: 14, fontStyle: 'bold' },
+    bodyStyles: { fillColor: [255, 255, 255], textColor: [26, 18, 9] },
+    didParseCell: d => { if (d.row.index === 1) { d.cell.styles.fontSize = 9; d.cell.styles.fontStyle = 'normal'; } },
+    theme: 'plain',
+  });
+
+  // Инфо о сотруднике
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 2,
+    body: [
+      ['Сотрудник', empName],
+      ['Должность', emp?.position ?? '—'],
+      ['Подразделение', emp?.department ?? '—'],
+      ['Период', `${monthName} ${year} г.`],
+      ['Оклад', r(salary)],
+    ],
+    styles: { fontSize: 10 },
+    columnStyles: { 0: { cellWidth: 50, textColor: [100, 100, 100] }, 1: { fontStyle: 'bold' } },
+    theme: 'plain',
+  });
+
+  // Начисления
+  const accruals = [['Оплата по окладу (базовая)', r(base)]];
+  if (overtime > 0) accruals.push(['Сверхурочные (ст. 152 ТК РФ)', r(overtime)]);
+  if (night    > 0) accruals.push(['Доплата за ночное время (ст. 154 ТК РФ)', r(night)]);
+  if (holiday  > 0) accruals.push(['Праздничные и выходные (ст. 153 ТК РФ)', r(holiday)]);
+  if (bonus    > 0) accruals.push(['Премия', r(bonus)]);
+  if (sick     > 0) accruals.push(['Пособие по нетрудоспособности', r(sick)]);
+  if (vacation > 0) accruals.push(['Отпускные', r(vacation)]);
+  accruals.push(['ИТОГО НАЧИСЛЕНО (gross)', r(gross)]);
+
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['НАЧИСЛЕНИЯ', 'Сумма']],
+    body: accruals,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
+    didParseCell: d => {
+      if (d.section === 'body' && d.row.index === accruals.length - 1) {
+        d.cell.styles.fontStyle = 'bold';
+        d.cell.styles.fillColor = [245, 240, 230];
+      }
+    },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // Удержания
+  const deductions = [
+    [`Стандартный вычет на детей (${children} реб.)`, r(childDed)],
+    ['НДФЛ 13%', r(ndfl)],
+  ];
+  if (deduct > 0) deductions.push(['Прочие удержания', r(deduct)]);
+  deductions.push(['ИТОГО УДЕРЖАНО', r(ndfl + deduct)]);
+
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['УДЕРЖАНИЯ', 'Сумма']],
+    body: deductions,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
+    didParseCell: d => {
+      if (d.section === 'body' && d.row.index === deductions.length - 1) {
+        d.cell.styles.fontStyle = 'bold';
+        d.cell.styles.fillColor = [245, 240, 230];
+      }
+    },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // К выплате
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    body: [['К ВЫПЛАТЕ (net)', r(net)]],
+    styles: { fontSize: 13, fontStyle: 'bold', fillColor: [26, 18, 9], textColor: [255, 255, 255], cellPadding: 5 },
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+    theme: 'plain',
+  });
+
+  // Страховые взносы
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)', 'Сумма']],
+    body: [['Взносы 30% (ОПС, ОМС, ОСС)', r(insurance)]],
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [80, 70, 50], textColor: [255, 255, 255] },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // Нижняя строка
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 6,
+    body: [[`Сформировано: ${new Date().toLocaleDateString('ru-RU')} · ИС Учёта Труда · ООО «ТехноСервис»`]],
+    styles: { fontSize: 7, textColor: [150, 150, 150], halign: 'center' },
+    theme: 'plain',
+  });
+
+  doc.save(`RaschetnyiList_${empName.split(' ')[0]}_${month}_${year}.pdf`);
+  docStatus('✦ Расчётный лист сформирован и скачан');
+}
   const empId    = document.getElementById('doc-employee').value;
   const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
   const month    = +document.getElementById('doc-month').value;
@@ -1248,216 +1416,7 @@ async function createPayslip() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  // Заголовок
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('РАСЧЁТНЫЙ ЛИСТ', 105, 18, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('ООО «ТехноСервис» · ст. 136 ТК РФ', 105, 25, { align: 'center' });
 
-  // Инфо
-  doc.autoTable({
-    startY: 30,
-    body: [
-      ['Сотрудник', empName],
-      ['Должность', emp?.position ?? '—'],
-      ['Подразделение', emp?.department ?? '—'],
-      ['Период', `${monthName} ${year} г.`],
-      ['Оклад', r(salary)],
-    ],
-    styles: { fontSize: 10 },
-    columnStyles: { 0: { cellWidth: 50, textColor: [100, 100, 100] }, 1: { fontStyle: 'bold' } },
-    theme: 'plain',
-  });
-
-  // Начисления
-  const accruals = [['Оплата по окладу (базовая)', r(base)]];
-  if (overtime > 0) accruals.push(['Сверхурочные (ст. 152 ТК РФ)', r(overtime)]);
-  if (night    > 0) accruals.push(['Доплата за ночное время (ст. 154 ТК РФ)', r(night)]);
-  if (holiday  > 0) accruals.push(['Праздничные и выходные (ст. 153 ТК РФ)', r(holiday)]);
-  if (bonus    > 0) accruals.push(['Премия', r(bonus)]);
-  if (sick     > 0) accruals.push(['Пособие по нетрудоспособности', r(sick)]);
-  if (vacation > 0) accruals.push(['Отпускные', r(vacation)]);
-  accruals.push(['ИТОГО НАЧИСЛЕНО (gross)', r(gross)]);
-
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4,
-    head: [['НАЧИСЛЕНИЯ', 'Сумма']],
-    body: accruals,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
-    bodyStyles: { textColor: [30, 20, 10] },
-    didParseCell: (data) => {
-      if (data.section === 'body' && data.row.index === accruals.length - 1) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fillColor = [245, 240, 230];
-      }
-    },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
-
-  // Удержания
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4,
-    head: [['УДЕРЖАНИЯ', 'Сумма']],
-    body: [
-      [`Стандартный вычет на детей (${children} реб.)`, r(childDed)],
-      ['НДФЛ 13%', r(ndfl)],
-      ...(deduct > 0 ? [['Прочие удержания', r(deduct)]] : []),
-      ['ИТОГО УДЕРЖАНО', r(ndfl + deduct)],
-    ],
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
-    didParseCell: (data) => {
-      const last = deduct > 0 ? 3 : 2;
-      if (data.section === 'body' && data.row.index === last) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fillColor = [245, 240, 230];
-      }
-    },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
-
-  // К выплате — крупно
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4,
-    body: [['К ВЫПЛАТЕ (net)', r(net)]],
-    styles: { fontSize: 13, fontStyle: 'bold', fillColor: [26, 18, 9], textColor: [255, 255, 255], cellPadding: 5 },
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-    theme: 'plain',
-  });
-
-  // Страховые взносы
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4,
-    head: [['СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)', 'Сумма']],
-    body: [['Взносы 30% (ОПС, ОМС, ОСС)', r(insurance)]],
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [80, 70, 50], textColor: [255, 255, 255] },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
-
-  // Нижний колонтитул
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(8);
-  doc.setTextColor(150);
-  doc.text(
-    `Расчётный лист сформирован автоматически · ИС Учёта Труда · ООО «ТехноСервис» · ${new Date().toLocaleDateString('ru-RU')}`,
-    105, finalY, { align: 'center' }
-  );
-
-  doc.save(`РасчётныйЛист_${empName.split(' ')[0]}_${monthName}_${year}.pdf`);
-  docStatus('✦ Расчётный лист сформирован и скачан');
-}
-/* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ ── */
-async function createPayslip() {
-  const empId   = document.getElementById('doc-employee').value;
-  const empName = document.getElementById('doc-employee').selectedOptions[0].text;
-  const month   = +document.getElementById('doc-month').value;
-  const year    = +document.getElementById('doc-year').value;
-  const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
-                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
-
-  docStatus('⟳ Формирование расчётного листа...');
-
-  let pr = null, emp = null;
-  if (supabaseClient) {
-    const [pRes, eRes] = await Promise.all([
-      supabaseClient.from('payroll').select('*')
-        .eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
-      supabaseClient.from('employees').select('*').eq('id', empId).single()
-    ]);
-    pr = pRes.data; emp = eRes.data;
-  }
-
-  // Заглушка если данных расчётного листа нет — считаем по окладу
-  const salary   = emp?.salary ?? 65000;
-  const base     = pr?.base_pay       ?? salary;
-  const overtime = pr?.overtime_pay   ?? 0;
-  const night    = pr?.night_pay      ?? 0;
-  const holiday  = pr?.holiday_pay    ?? 0;
-  const bonus    = pr?.bonus          ?? 0;
-  const sick     = pr?.sick_pay       ?? 0;
-  const vacation = pr?.vacation_pay   ?? 0;
-  const gross    = pr?.gross_total    ?? base;
-  const ndfl     = pr?.ndfl           ?? Math.round(gross * 0.13);
-  const deduct   = pr?.other_deductions ?? 0;
-  const net      = pr?.net_pay        ?? (gross - ndfl - deduct);
-  const insurance = pr?.insurance_total ?? Math.round(gross * 0.30);
-  const children = emp?.tax_children  ?? 0;
-  const childDed = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
-
-  const r = n => Number(n).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-
-  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-<title>Расчётный лист ${empName} ${monthName} ${year}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #000; }
-  h2 { text-align: center; font-size: 13px; margin-bottom: 2px; }
-  .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 16px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
-  td, th { border: 1px solid #000; padding: 5px 8px; font-size: 11px; }
-  th { background: #f0f0f0; text-align: left; }
-  .amount { text-align: right; font-weight: bold; }
-  .total-row td { background: #f5f5f5; font-weight: bold; }
-  .net-row td { background: #1a1209; color: #fff; font-weight: bold; font-size: 12px; }
-  .info-table td { border: none; border-bottom: 1px solid #ddd; padding: 4px 8px; }
-  .info-table td:first-child { color: #555; width: 200px; }
-</style></head><body>
-
-<h2>РАСЧЁТНЫЙ ЛИСТ</h2>
-<div class="sub">ООО «ТехноСервис» · Форма, утверждённая ст. 136 ТК РФ</div>
-
-<table class="info-table">
-  <tr><td>Сотрудник:</td><td><strong>${empName}</strong></td></tr>
-  <tr><td>Должность:</td><td>${emp?.position ?? '—'}</td></tr>
-  <tr><td>Подразделение:</td><td>${emp?.department ?? '—'}</td></tr>
-  <tr><td>Расчётный период:</td><td>${monthName} ${year} г.</td></tr>
-  <tr><td>Оклад:</td><td>${r(salary)} руб.</td></tr>
-</table>
-
-<table>
-  <tr><th colspan="2">НАЧИСЛЕНИЯ</th></tr>
-  <tr><td>Оплата по окладу (базовая)</td><td class="amount">${r(base)} ₽</td></tr>
-  ${overtime > 0 ? `<tr><td>Сверхурочные (ст. 152 ТК РФ)</td><td class="amount">${r(overtime)} ₽</td></tr>` : ''}
-  ${night    > 0 ? `<tr><td>Доплата за ночное время (ст. 154 ТК РФ)</td><td class="amount">${r(night)} ₽</td></tr>` : ''}
-  ${holiday  > 0 ? `<tr><td>Праздничные и выходные (ст. 153 ТК РФ)</td><td class="amount">${r(holiday)} ₽</td></tr>` : ''}
-  ${bonus    > 0 ? `<tr><td>Премия</td><td class="amount">${r(bonus)} ₽</td></tr>` : ''}
-  ${sick     > 0 ? `<tr><td>Пособие по нетрудоспособности</td><td class="amount">${r(sick)} ₽</td></tr>` : ''}
-  ${vacation > 0 ? `<tr><td>Отпускные</td><td class="amount">${r(vacation)} ₽</td></tr>` : ''}
-  <tr class="total-row"><td>ИТОГО НАЧИСЛЕНО (gross)</td><td class="amount">${r(gross)} ₽</td></tr>
-</table>
-
-<table>
-  <tr><th colspan="2">УДЕРЖАНИЯ</th></tr>
-  <tr><td>Стандартный вычет на детей (${children} реб., ${r(childDed)} руб.)</td><td class="amount">${r(childDed)} ₽</td></tr>
-  <tr><td>НДФЛ 13% с налогооблагаемой базы</td><td class="amount">${r(ndfl)} ₽</td></tr>
-  ${deduct > 0 ? `<tr><td>Прочие удержания</td><td class="amount">${r(deduct)} ₽</td></tr>` : ''}
-  <tr class="total-row"><td>ИТОГО УДЕРЖАНО</td><td class="amount">${r(ndfl + deduct)} ₽</td></tr>
-</table>
-
-<table>
-  <tr class="net-row"><td>К ВЫПЛАТЕ (net)</td><td class="amount">${r(net)} ₽</td></tr>
-</table>
-
-<table>
-  <tr><th colspan="2">СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя, не удерживаются)</th></tr>
-  <tr><td>Взносы 30% (ОПС, ОМС, ОСС)</td><td class="amount">${r(insurance)} ₽</td></tr>
-</table>
-
-<p style="font-size:9px;color:#888;margin-top:20px;">
-  Расчётный лист сформирован автоматически ИС Учёта Труда · ООО «ТехноСервис» · ${new Date().toLocaleDateString('ru-RU')}
-</p>
-
-</body></html>`;
-
-  downloadHtml(html, `РасчётныйЛист_${empName.split(' ')[0]}_${monthName}_${year}.html`);
-  docStatus('✦ Расчётный лист сформирован и скачан');
-}
 </script>
 </body>
 </html>
