@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1120,126 +1122,237 @@ async function loadEmployeesForDocs() {
   sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
 }
 
-/* ── СКАЧАТЬ HTML КАК ФАЙЛ ── */
-function downloadHtml(content, filename) {
-  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function docStatus(msg) {
-  document.getElementById('doc-status').textContent = msg;
-}
-
-/* ── СОЗДАТЬ ТАБЕЛЬ (Форма Т-13) ── */
+/* ── СОЗДАТЬ ТАБЕЛЬ (PDF) ── */
 async function createTimesheet() {
-  const empId   = document.getElementById('doc-employee').value;
-  const empName = document.getElementById('doc-employee').selectedOptions[0].text;
-  const month   = +document.getElementById('doc-month').value;
-  const year    = +document.getElementById('doc-year').value;
+  const empId    = document.getElementById('doc-employee').value;
+  const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
+  const month    = +document.getElementById('doc-month').value;
+  const year     = +document.getElementById('doc-year').value;
   const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
                      'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
-
   docStatus('⟳ Формирование табеля...');
 
-  // Берём данные табеля из Supabase (если есть)
   let ts = null;
   if (supabaseClient) {
     const { data } = await supabaseClient.from('timesheets')
-      .select('*')
-      .eq('employee_id', empId)
-      .eq('period_year', year)
-      .eq('period_month', month)
-      .single();
+      .select('*').eq('employee_id', empId)
+      .eq('period_year', year).eq('period_month', month).single();
     ts = data;
   }
 
-  // Дней в месяце
-  const daysInMonth = new Date(year, month, 0).getDate();
-  // Заглушка если данных нет
-  const worked  = ts?.worked_days  ?? 21;
-  const normDay = ts?.work_days    ?? 21;
-  const overtime = ts?.overtime_hrs ?? 0;
-  const night    = ts?.night_hrs    ?? 0;
-  const sick     = ts?.sick_days    ?? 0;
+  const worked   = ts?.worked_days   ?? 21;
+  const normDay  = ts?.work_days     ?? 21;
+  const overtime = ts?.overtime_hrs  ?? 0;
+  const night    = ts?.night_hrs     ?? 0;
+  const sick     = ts?.sick_days     ?? 0;
   const vacation = ts?.vacation_days ?? 0;
+  const daysInMonth = new Date(year, month, 0).getDate();
 
-  // Таблица дней месяца
-  let daysRow1 = '', daysRow2 = '', marksRow1 = '', marksRow2 = '';
-  for (let d = 1; d <= Math.min(daysInMonth, 16); d++) {
-    daysRow1 += `<td>${d}</td>`;
-    marksRow1 += `<td>Я</td>`;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  // Заголовок
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ', 148, 15, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Форма № Т-13 · ООО «ТехноСервис»', 148, 22, { align: 'center' });
+
+  // Инфо о сотруднике
+  doc.setFontSize(10);
+  doc.text(`Сотрудник: ${empName}`, 14, 32);
+  doc.text(`Период: ${monthName} ${year} г.`, 14, 38);
+  doc.text(`Табельный номер: ${empId.slice(0,8).toUpperCase()}`, 14, 44);
+
+  // Таблица дней
+  const dayHeaders = [];
+  const dayMarks = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    dayHeaders.push(String(d));
+    dayMarks.push('Я');
   }
-  for (let d = 17; d <= daysInMonth; d++) {
-    daysRow2 += `<td>${d}</td>`;
-    marksRow2 += `<td>Я</td>`;
-  }
 
-  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-<title>Табель ${empName} ${monthName} ${year}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #000; }
-  h2 { text-align: center; font-size: 13px; margin-bottom: 4px; }
-  .sub { text-align: center; font-size: 11px; margin-bottom: 16px; color: #333; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
-  td, th { border: 1px solid #000; padding: 4px 6px; text-align: center; font-size: 10px; }
-  th { background: #f0f0f0; }
-  .info-table td { border: none; border-bottom: 1px solid #000; padding: 3px 8px; text-align: left; }
-  .info-table td:first-child { color: #555; width: 180px; }
-  .sign { margin-top: 30px; display: flex; gap: 60px; }
-  .sign div { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 10px; color: #555; }
-</style></head><body>
+  doc.autoTable({
+    startY: 50,
+    head: [['', ...dayHeaders]],
+    body: [['Отметка', ...dayMarks]],
+    styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255], fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 20, halign: 'left', fontStyle: 'bold' } },
+    theme: 'grid',
+  });
 
-<h2>ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ</h2>
-<div class="sub">Форма № Т-13 · ООО «ТехноСервис»</div>
+  // Итоговая таблица
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 6,
+    head: [['Отработано дней', 'Норма дней', 'Сверхурочные, ч', 'Ночные, ч', 'Больничные, дн', 'Отпуск, дн']],
+    body: [[worked, normDay, overtime, night, sick, vacation]],
+    styles: { fontSize: 9, halign: 'center' },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
+    theme: 'grid',
+  });
 
-<table class="info-table">
-  <tr><td>Сотрудник:</td><td><strong>${empName}</strong></td></tr>
-  <tr><td>Период:</td><td>${monthName} ${year} г.</td></tr>
-  <tr><td>Табельный номер:</td><td>${empId.slice(0,8).toUpperCase()}</td></tr>
-</table>
+  // Легенда и подписи
+  const y = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text('Условные обозначения: Я — явка, Б — больничный, ОТ — отпуск, В — выходной, СВ — сверхурочные', 14, y);
+  doc.setTextColor(0);
+  doc.setFontSize(9);
+  doc.text('Ответственный за ведение табеля: ____________________', 14, y + 12);
+  doc.text('Руководитель подразделения: ____________________', 100, y + 12);
+  doc.text('Работник отдела кадров: ____________________', 190, y + 12);
 
-<p style="margin:12px 0 4px;font-weight:bold;">1–16 число:</p>
-<table>
-  <tr><th>День</th>${daysRow1}</tr>
-  <tr><th>Отметка</th>${marksRow1}</tr>
-</table>
-
-<p style="margin:12px 0 4px;font-weight:bold;">17–${daysInMonth} число:</p>
-<table>
-  <tr><th>День</th>${daysRow2}</tr>
-  <tr><th>Отметка</th>${marksRow2}</tr>
-</table>
-
-<table>
-  <tr>
-    <th>Отработано дней</th><th>Норма дней</th>
-    <th>Сверхурочные, ч</th><th>Ночные, ч</th>
-    <th>Больничные, дн</th><th>Отпуск, дн</th>
-  </tr>
-  <tr>
-    <td>${worked}</td><td>${normDay}</td>
-    <td>${overtime}</td><td>${night}</td>
-    <td>${sick}</td><td>${vacation}</td>
-  </tr>
-</table>
-
-<p style="font-size:10px;color:#555;">Условные обозначения: Я — явка, Б — больничный, ОТ — отпуск, В — выходной, СВ — сверхурочные</p>
-
-<div class="sign">
-  <div>Ответственный за ведение табеля ___________________</div>
-  <div>Руководитель подразделения ___________________</div>
-  <div>Работник отдела кадров ___________________</div>
-</div>
-
-</body></html>`;
-
-  downloadHtml(html, `Табель_${empName.split(' ')[0]}_${monthName}_${year}.html`);
+  doc.save(`Табель_${empName.split(' ')[0]}_${monthName}_${year}.pdf`);
   docStatus('✦ Табель сформирован и скачан');
 }
 
+/* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ (PDF) ── */
+async function createPayslip() {
+  const empId    = document.getElementById('doc-employee').value;
+  const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
+  const month    = +document.getElementById('doc-month').value;
+  const year     = +document.getElementById('doc-year').value;
+  const monthName = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month];
+  docStatus('⟳ Формирование расчётного листа...');
+
+  let pr = null, emp = null;
+  if (supabaseClient) {
+    const [pRes, eRes] = await Promise.all([
+      supabaseClient.from('payroll').select('*')
+        .eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
+      supabaseClient.from('employees').select('*').eq('id', empId).single()
+    ]);
+    pr = pRes.data; emp = eRes.data;
+  }
+
+  const salary   = emp?.salary           ?? 65000;
+  const base     = pr?.base_pay          ?? salary;
+  const overtime = pr?.overtime_pay      ?? 0;
+  const night    = pr?.night_pay         ?? 0;
+  const holiday  = pr?.holiday_pay       ?? 0;
+  const bonus    = pr?.bonus             ?? 0;
+  const sick     = pr?.sick_pay          ?? 0;
+  const vacation = pr?.vacation_pay      ?? 0;
+  const gross    = pr?.gross_total       ?? base;
+  const ndfl     = pr?.ndfl              ?? Math.round(gross * 0.13);
+  const deduct   = pr?.other_deductions  ?? 0;
+  const net      = pr?.net_pay           ?? (gross - ndfl - deduct);
+  const insurance = pr?.insurance_total  ?? Math.round(gross * 0.30);
+  const children  = emp?.tax_children    ?? 0;
+  const childDed  = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+  const r = n => Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' руб.';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Заголовок
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('РАСЧЁТНЫЙ ЛИСТ', 105, 18, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('ООО «ТехноСервис» · ст. 136 ТК РФ', 105, 25, { align: 'center' });
+
+  // Инфо
+  doc.autoTable({
+    startY: 30,
+    body: [
+      ['Сотрудник', empName],
+      ['Должность', emp?.position ?? '—'],
+      ['Подразделение', emp?.department ?? '—'],
+      ['Период', `${monthName} ${year} г.`],
+      ['Оклад', r(salary)],
+    ],
+    styles: { fontSize: 10 },
+    columnStyles: { 0: { cellWidth: 50, textColor: [100, 100, 100] }, 1: { fontStyle: 'bold' } },
+    theme: 'plain',
+  });
+
+  // Начисления
+  const accruals = [['Оплата по окладу (базовая)', r(base)]];
+  if (overtime > 0) accruals.push(['Сверхурочные (ст. 152 ТК РФ)', r(overtime)]);
+  if (night    > 0) accruals.push(['Доплата за ночное время (ст. 154 ТК РФ)', r(night)]);
+  if (holiday  > 0) accruals.push(['Праздничные и выходные (ст. 153 ТК РФ)', r(holiday)]);
+  if (bonus    > 0) accruals.push(['Премия', r(bonus)]);
+  if (sick     > 0) accruals.push(['Пособие по нетрудоспособности', r(sick)]);
+  if (vacation > 0) accruals.push(['Отпускные', r(vacation)]);
+  accruals.push(['ИТОГО НАЧИСЛЕНО (gross)', r(gross)]);
+
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['НАЧИСЛЕНИЯ', 'Сумма']],
+    body: accruals,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
+    bodyStyles: { textColor: [30, 20, 10] },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.row.index === accruals.length - 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [245, 240, 230];
+      }
+    },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // Удержания
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['УДЕРЖАНИЯ', 'Сумма']],
+    body: [
+      [`Стандартный вычет на детей (${children} реб.)`, r(childDed)],
+      ['НДФЛ 13%', r(ndfl)],
+      ...(deduct > 0 ? [['Прочие удержания', r(deduct)]] : []),
+      ['ИТОГО УДЕРЖАНО', r(ndfl + deduct)],
+    ],
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
+    didParseCell: (data) => {
+      const last = deduct > 0 ? 3 : 2;
+      if (data.section === 'body' && data.row.index === last) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [245, 240, 230];
+      }
+    },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // К выплате — крупно
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    body: [['К ВЫПЛАТЕ (net)', r(net)]],
+    styles: { fontSize: 13, fontStyle: 'bold', fillColor: [26, 18, 9], textColor: [255, 255, 255], cellPadding: 5 },
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+    theme: 'plain',
+  });
+
+  // Страховые взносы
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 4,
+    head: [['СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)', 'Сумма']],
+    body: [['Взносы 30% (ОПС, ОМС, ОСС)', r(insurance)]],
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [80, 70, 50], textColor: [255, 255, 255] },
+    theme: 'striped',
+    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
+  });
+
+  // Нижний колонтитул
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text(
+    `Расчётный лист сформирован автоматически · ИС Учёта Труда · ООО «ТехноСервис» · ${new Date().toLocaleDateString('ru-RU')}`,
+    105, finalY, { align: 'center' }
+  );
+
+  doc.save(`РасчётныйЛист_${empName.split(' ')[0]}_${monthName}_${year}.pdf`);
+  docStatus('✦ Расчётный лист сформирован и скачан');
+}
 /* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ ── */
 async function createPayslip() {
   const empId   = document.getElementById('doc-employee').value;
