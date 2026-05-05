@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1152,7 +1153,7 @@ function getDocData() {
   const position = document.getElementById('doc-position').value.trim() || '—';
   const dept     = document.getElementById('doc-dept').value.trim() || '—';
   const tabnum   = document.getElementById('doc-tabnum').value.trim() || '—';
-  const monthVal = document.getElementById('doc-month').value;   // "2025-01"
+  const monthVal = document.getElementById('doc-month').value;
   const salary   = +document.getElementById('doc-salary').value  || 0;
   const worked   = +document.getElementById('doc-worked').value  || 0;
   const workdays = +document.getElementById('doc-workdays').value|| 1;
@@ -1161,7 +1162,6 @@ function getDocData() {
   const bonusPct = +document.getElementById('doc-bonus').value   || 0;
   const children = +document.getElementById('doc-children').value|| 0;
 
-  // Parse month label
   let monthLabel = monthVal;
   if (monthVal) {
     const [y, m] = monthVal.split('-');
@@ -1170,387 +1170,343 @@ function getDocData() {
     monthLabel = (months[+m - 1] || m) + ' ' + y;
   }
 
-  const hourRate  = salary / (workdays * 8);
-  const dailyRate = salary / workdays;
-  const base      = dailyRate * worked;
-  const ot1       = Math.min(overtime, 2) * hourRate * 1.5;
-  const ot2       = Math.max(0, overtime - 2) * hourRate * 2;
+  const hourRate    = salary / (workdays * 8);
+  const dailyRate   = salary / workdays;
+  const base        = dailyRate * worked;
+  const ot1         = Math.min(overtime, 2) * hourRate * 1.5;
+  const ot2         = Math.max(0, overtime - 2) * hourRate * 2;
   const overtimePay = ot1 + ot2;
-  const nightPay  = night * hourRate * 0.2;
-  const bonus     = base * bonusPct / 100;
-  const gross     = base + overtimePay + nightPay + bonus;
+  const nightPay    = night * hourRate * 0.2;
+  const bonus       = base * bonusPct / 100;
+  const gross       = base + overtimePay + nightPay + bonus;
   const childDeduct = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
-  const taxable   = Math.max(0, gross - childDeduct);
-  const ndfl      = taxable * 0.13;
-  const net       = gross - ndfl;
-  const pfr       = gross * 0.22;
-  const foms      = gross * 0.051;
-  const fss       = gross * 0.029;
+  const taxable     = Math.max(0, gross - childDeduct);
+  const ndfl        = taxable * 0.13;
+  const net         = gross - ndfl;
+  const pfr         = gross * 0.22;
+  const foms        = gross * 0.051;
+  const fss         = gross * 0.029;
 
   return { name, position, dept, tabnum, monthLabel, salary, worked, workdays,
            overtime, night, bonusPct, children, base, overtimePay, nightPay,
-           bonus, gross, ndfl, net, pfr, foms, fss, childDeduct };
+           bonus, gross, ndfl, net, pfr, foms, fss, childDeduct, dailyRate };
 }
 
-function r(n) { return Math.round(n).toLocaleString('ru-RU'); }
+function rub(n) { return Math.round(n).toLocaleString('ru-RU'); }
 
-/* ── ТАБЕЛЬ ── */
-function generateTimesheet() {
-  if (typeof window.jspdf === 'undefined') {
-    alert('Библиотека jsPDF не загружена. Проверьте подключение к интернету.');
-    return;
-  }
+/* Рендерит скрытый HTML-элемент в PDF через html2canvas */
+async function renderHtmlToPdf(el, orientation, fileName) {
   const { jsPDF } = window.jspdf;
-  const d = getDocData();
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-  // Font — jsPDF built-in supports latin; for Cyrillic we use a workaround with canvas or encode manually.
-  // We use the standard helvetica but encode Russian via a simple map approach.
-  // Easiest reliable method: draw text as-is (jsPDF 2.x supports UTF-8 with standard fonts on modern browsers).
-  doc.setFont('helvetica', 'normal');
-
-  // ── ШАПКА ──
-  doc.setFontSize(10);
-  doc.text('ООО "ТехноСервис"', 148, 15, { align: 'center' });
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ', 148, 24, { align: 'center' });
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Унифицированная форма № Т-13', 148, 30, { align: 'center' });
-
-  // Горизонтальная линия
-  doc.setLineWidth(0.5);
-  doc.line(15, 33, 282, 33);
-
-  // Инфо строки
-  doc.setFontSize(9);
-  doc.text('Период: ' + d.monthLabel, 15, 40);
-  doc.text('Подразделение: ' + d.dept, 15, 46);
-  doc.text('Табельный номер: ' + d.tabnum, 200, 40);
-
-  // ── ТАБЛИЦА СОТРУДНИКА ──
-  const tY = 52;
-  const cols = [15, 60, 110, 140, 165, 200, 230, 260, 282];
-  const headers = ['№', 'Сотрудник', 'Должность', 'Таб.№', 'Дней\nпо норме', 'Отработано\nдней', 'Сверхур.\nчасов', 'Ночных\nчасов', ''];
-
-  // Header row
-  doc.setFillColor(40, 30, 10);
-  doc.setTextColor(245, 239, 224);
-  doc.rect(cols[0], tY, cols[8]-cols[0], 12, 'F');
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'bold');
-  for (let i = 0; i < 8; i++) {
-    const cx = (cols[i] + cols[i+1]) / 2;
-    const lines = headers[i].split('\n');
-    lines.forEach((ln, li) => doc.text(ln, cx, tY + 4.5 + li * 3.5, { align: 'center' }));
-  }
-
-  // Data row
-  doc.setTextColor(26, 18, 9);
-  doc.setFillColor(245, 239, 224);
-  doc.rect(cols[0], tY+12, cols[8]-cols[0], 10, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  const rowData = ['1', d.name, d.position, d.tabnum,
-                   String(d.workdays), String(d.worked),
-                   String(d.overtime), String(d.night)];
-  for (let i = 0; i < 8; i++) {
-    const cx = (cols[i] + cols[i+1]) / 2;
-    doc.text(rowData[i], cx, tY + 18, { align: 'center' });
-  }
-  // Grid lines
-  doc.setLineWidth(0.3);
-  for (let i = 0; i < cols.length; i++) doc.line(cols[i], tY, cols[i], tY+22);
-  doc.line(cols[0], tY, cols[8], tY);
-  doc.line(cols[0], tY+12, cols[8], tY+12);
-  doc.line(cols[0], tY+22, cols[8], tY+22);
-
-  // ── КАЛЕНДАРНАЯ СЕТКА ──
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Учёт рабочего времени по дням месяца:', 15, 85);
-
-  const gridY = 90;
-  const cellW = 8.2;
-  const cellH = 8;
-  const daysInMonth = d.workdays + 6; // approximate total days
-  const actualDays = 31;
-
-  // Day headers
-  doc.setFillColor(60, 45, 15);
-  doc.setTextColor(245, 239, 224);
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'bold');
-  for (let day = 1; day <= actualDays; day++) {
-    const x = 15 + (day-1) * cellW;
-    doc.rect(x, gridY, cellW, cellH*0.7, 'F');
-    doc.text(String(day), x + cellW/2, gridY + 4, { align: 'center' });
-  }
-
-  // Hours row
-  doc.setFillColor(253, 248, 240);
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'normal');
-  for (let day = 1; day <= actualDays; day++) {
-    const x = 15 + (day-1) * cellW;
-    // Mark weekends (Sat=6, Sun=0) - approximate for Jan 2025
-    const isWeekend = (day % 7 === 0 || day % 7 === 6);
-    if (isWeekend) {
-      doc.setFillColor(220, 200, 160);
-    } else {
-      doc.setFillColor(253, 248, 240);
-    }
-    doc.rect(x, gridY + cellH*0.7, cellW, cellH, 'F');
-    if (!isWeekend && day <= d.worked) {
-      doc.text('8', x + cellW/2, gridY + cellH*0.7 + 5.5, { align: 'center' });
-    } else if (isWeekend) {
-      doc.text('В', x + cellW/2, gridY + cellH*0.7 + 5.5, { align: 'center' });
-    }
-    doc.rect(x, gridY + cellH*0.7, cellW, cellH, 'S');
-    doc.rect(x, gridY, cellW, cellH*0.7, 'S');
-  }
-
-  // Legend
-  doc.setFontSize(8);
-  doc.setTextColor(26, 18, 9);
-  doc.text('8 — рабочий день (8 ч)   В — выходной день', 15, gridY + cellH*1.7 + 8);
-
-  // ── ИТОГИ ──
-  const sumY = gridY + cellH*1.7 + 20;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('ИТОГИ ЗА ПЕРИОД:', 15, sumY);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-
-  const items = [
-    ['Рабочих дней по норме:', d.workdays + ' дн.'],
-    ['Фактически отработано:', d.worked + ' дн. / ' + (d.worked * 8) + ' ч.'],
-    ['Сверхурочные часы:', d.overtime + ' ч.'],
-    ['Ночные часы:', d.night + ' ч.'],
-    ['Итого часов:', (d.worked * 8 + d.overtime) + ' ч.'],
-  ];
-  items.forEach(([label, val], i) => {
-    doc.text(label, 15, sumY + 8 + i * 6);
-    doc.text(val, 100, sumY + 8 + i * 6);
+  const scale = 2;
+  const canvas = await html2canvas(el, {
+    scale: scale,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#ffffff',
+    logging: false
   });
 
-  // ── ПОДПИСИ ──
-  const sigY = sumY + 50;
-  doc.setLineWidth(0.3);
-  doc.line(15, sigY, 90, sigY);
-  doc.line(120, sigY, 195, sigY);
-  doc.line(210, sigY, 282, sigY);
-  doc.setFontSize(8);
-  doc.text('Руководитель подразделения', 15, sigY + 4);
-  doc.text('Работник отдела кадров', 120, sigY + 4);
-  doc.text('Дата составления: ___________', 210, sigY + 4);
+  const imgData  = canvas.toDataURL('image/png');
+  const isLand   = orientation === 'landscape';
+  const pageW    = isLand ? 297 : 210;
+  const pageH    = isLand ? 210 : 297;
+  const pdf      = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
 
-  // ── СОХРАНЕНИЕ ──
-  const fileName = 'Tabel_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
-  doc.save(fileName);
+  const imgW = pageW - 10;
+  const imgH = (canvas.height / canvas.width) * imgW;
+
+  if (imgH <= pageH - 10) {
+    pdf.addImage(imgData, 'PNG', 5, 5, imgW, imgH);
+  } else {
+    // Многостраничный вывод
+    let remainH = imgH;
+    let posY = 0;
+    const sliceH = pageH - 10;
+    while (remainH > 0) {
+      pdf.addImage(imgData, 'PNG', 5, 5 - posY, imgW, imgH);
+      remainH -= sliceH;
+      posY    += sliceH;
+      if (remainH > 0) pdf.addPage();
+    }
+  }
+
+  pdf.save(fileName);
+}
+
+/* ── ТАБЕЛЬ ── */
+async function generateTimesheet() {
+  if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+    alert('Библиотеки PDF не загружены. Проверьте подключение к интернету.');
+    return;
+  }
+  const d = getDocData();
+
+  // Генерируем дни месяца
+  let daysHtml = '';
+  const [yr, mo] = (document.getElementById('doc-month').value || '2025-01').split('-');
+  const totalDays = new Date(+yr, +mo, 0).getDate();
+
+  // Определяем рабочие/выходные (простое правило: Сб=6, Вс=0)
+  for (let day = 1; day <= totalDays; day++) {
+    const dow = new Date(+yr, +mo - 1, day).getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+    let cell = '';
+    if (isWeekend) {
+      cell = `<td style="background:#d4c090;text-align:center;font-size:9px;padding:3px 0;">В</td>`;
+    } else if (day <= d.worked) {
+      cell = `<td style="text-align:center;font-size:9px;padding:3px 0;">8</td>`;
+    } else {
+      cell = `<td style="text-align:center;font-size:9px;padding:3px 0;color:#aaa;">—</td>`;
+    }
+    daysHtml += cell;
+  }
+
+  const html = `
+  <div style="font-family:'Arial',sans-serif;padding:20px;background:#fff;width:1050px;color:#1a1209;">
+    <div style="text-align:center;margin-bottom:4px;font-size:13px;">ООО «ТехноСервис»</div>
+    <div style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:2px;">ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ</div>
+    <div style="text-align:center;font-size:11px;margin-bottom:2px;">Унифицированная форма № Т-13</div>
+    <hr style="border:1px solid #b8973e;margin:8px 0;">
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;">
+      <div><b>Период:</b> ${d.monthLabel}</div>
+      <div><b>Подразделение:</b> ${d.dept}</div>
+      <div><b>Табельный номер:</b> ${d.tabnum}</div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px;">
+      <thead>
+        <tr style="background:#1a1209;color:#f5efe0;">
+          <th style="padding:6px 4px;border:1px solid #b8973e;">№</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Сотрудник</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Должность</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Таб. №</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Дней по норме</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Отработано дней</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Сверхурочные, ч.</th>
+          <th style="padding:6px 4px;border:1px solid #b8973e;">Ночные, ч.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#f5efe0;">
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">1</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;">${d.name}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;">${d.position}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">${d.tabnum}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">${d.workdays}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">${d.worked}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">${d.overtime}</td>
+          <td style="padding:6px 4px;border:1px solid #d4b870;text-align:center;">${d.night}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="font-weight:bold;margin-bottom:8px;font-size:13px;">Учёт рабочего времени по дням месяца:</div>
+    <table style="border-collapse:collapse;font-size:9px;width:100%;margin-bottom:10px;">
+      <thead>
+        <tr style="background:#3c2d0f;color:#f5efe0;">
+          ${Array.from({length:totalDays},(_,i)=>`<th style="border:1px solid #b8973e;padding:3px;min-width:28px;text-align:center;">${i+1}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>${daysHtml}</tr>
+      </tbody>
+    </table>
+    <div style="font-size:11px;margin-bottom:16px;color:#555;">
+      <b>8</b> — рабочий день (8 ч) &nbsp;&nbsp;&nbsp; <b>В</b> — выходной день &nbsp;&nbsp;&nbsp; <b>—</b> — не отработано
+    </div>
+
+    <div style="font-weight:bold;margin-bottom:8px;font-size:13px;">ИТОГИ ЗА ПЕРИОД:</div>
+    <table style="font-size:12px;border-collapse:collapse;width:55%;">
+      <tr><td style="padding:4px 12px 4px 0;">Рабочих дней по норме:</td><td style="padding:4px;font-weight:bold;">${d.workdays} дн.</td></tr>
+      <tr style="background:#f5efe0;"><td style="padding:4px 12px 4px 0;">Фактически отработано:</td><td style="padding:4px;font-weight:bold;">${d.worked} дн. / ${d.worked * 8} ч.</td></tr>
+      <tr><td style="padding:4px 12px 4px 0;">Сверхурочные часы:</td><td style="padding:4px;font-weight:bold;">${d.overtime} ч.</td></tr>
+      <tr style="background:#f5efe0;"><td style="padding:4px 12px 4px 0;">Ночные часы:</td><td style="padding:4px;font-weight:bold;">${d.night} ч.</td></tr>
+      <tr><td style="padding:4px 12px 4px 0;">Итого часов:</td><td style="padding:4px;font-weight:bold;">${d.worked * 8 + d.overtime} ч.</td></tr>
+    </table>
+
+    <div style="display:flex;justify-content:space-between;margin-top:40px;font-size:11px;">
+      <div style="border-top:1px solid #333;padding-top:4px;width:220px;text-align:center;">Руководитель подразделения</div>
+      <div style="border-top:1px solid #333;padding-top:4px;width:220px;text-align:center;">Работник отдела кадров</div>
+      <div style="border-top:1px solid #333;padding-top:4px;width:220px;text-align:center;">Дата составления: ___________</div>
+    </div>
+  </div>`;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
+  wrapper.innerHTML = html;
+  document.body.appendChild(wrapper);
+
+  try {
+    const fileName = 'Tabel_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
+    await renderHtmlToPdf(wrapper.firstElementChild, 'landscape', fileName);
+  } finally {
+    document.body.removeChild(wrapper);
+  }
 }
 
 /* ── РАСЧЁТНЫЙ ЛИСТ ── */
-function generatePayslip() {
-  if (typeof window.jspdf === 'undefined') {
-    alert('Библиотека jsPDF не загружена. Проверьте подключение к интернету.');
+async function generatePayslip() {
+  if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+    alert('Библиотеки PDF не загружены. Проверьте подключение к интернету.');
     return;
   }
-  const { jsPDF } = window.jspdf;
   const d = getDocData();
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const childLabel = d.children === 0 ? 'нет' : d.children === 1 ? '1 ребёнок' : d.children === 2 ? '2 ребёнка' : '3 и более';
 
-  doc.setFont('helvetica', 'normal');
+  let accrualRows = `
+    <tr style="background:#fdf8f0;">
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Оклад (тарифная часть)</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${d.worked}</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${rub(d.dailyRate)}/дн.</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.base)}</td>
+    </tr>`;
+  if (d.overtime > 0) accrualRows += `
+    <tr>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Сверхурочные (${d.overtime} ч.)</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">1,5x / 2x</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.overtimePay)}</td>
+    </tr>`;
+  if (d.night > 0) accrualRows += `
+    <tr style="background:#fdf8f0;">
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Доплата за ночные (${d.night} ч.)</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">+20%</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.nightPay)}</td>
+    </tr>`;
+  if (d.bonusPct > 0) accrualRows += `
+    <tr>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Премия (${d.bonusPct}%)</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${d.bonusPct}%</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.bonus)}</td>
+    </tr>`;
 
-  // ── ШАПКА ──
-  doc.setFillColor(26, 18, 9);
-  doc.rect(0, 0, 210, 38, 'F');
-  doc.setTextColor(245, 239, 224);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ООО "ТехноСервис" · ИНН 5260000000', 105, 10, { align: 'center' });
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('РАСЧЁТНЫЙ ЛИСТОК', 105, 20, { align: 'center' });
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('за ' + d.monthLabel, 105, 28, { align: 'center' });
-  doc.setTextColor(184, 151, 62);
-  doc.text('Документ сформирован автоматически информационной системой', 105, 35, { align: 'center' });
+  let deductRows = '';
+  if (d.childDeduct > 0) deductRows += `
+    <tr style="background:#fdf8f0;">
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Налоговый вычет на детей (${childLabel})</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;color:#2c6b22;font-weight:bold;">−${rub(d.childDeduct)}</td>
+    </tr>`;
+  deductRows += `
+    <tr>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;">НДФЛ (налог на доходы физических лиц)</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${rub(d.gross - d.childDeduct)}</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">13%</td>
+      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.ndfl)}</td>
+    </tr>`;
 
-  // ── ДАННЫЕ СОТРУДНИКА ──
-  doc.setTextColor(26, 18, 9);
-  doc.setFillColor(245, 239, 224);
-  doc.rect(15, 44, 180, 28, 'F');
-  doc.setLineWidth(0.5);
-  doc.setDrawColor(184, 151, 62);
-  doc.rect(15, 44, 180, 28, 'S');
+  const today = new Date().toLocaleDateString('ru-RU');
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('СОТРУДНИК', 20, 51);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(d.name, 20, 58);
-  doc.setFontSize(9);
-  doc.text('Должность: ' + d.position, 20, 64);
-  doc.text('Подразделение: ' + d.dept, 20, 70);
+  const html = `
+  <div style="font-family:'Arial',sans-serif;padding:0;background:#fff;width:680px;color:#1a1209;">
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Табельный №:', 140, 51);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-  doc.text(d.tabnum, 140, 60);
-  doc.setFontSize(9);
-  doc.text('Оклад: ' + r(d.salary) + ' руб.', 140, 67);
+    <div style="background:#1a1209;color:#f5efe0;padding:18px 24px;text-align:center;">
+      <div style="font-size:11px;margin-bottom:4px;">ООО «ТехноСервис» · ИНН 5260000000</div>
+      <div style="font-size:20px;font-weight:bold;margin-bottom:4px;">РАСЧЁТНЫЙ ЛИСТОК</div>
+      <div style="font-size:13px;margin-bottom:4px;">за ${d.monthLabel}</div>
+      <div style="font-size:10px;color:#b8973e;">Документ сформирован автоматически информационной системой</div>
+    </div>
 
-  // ── НАЧИСЛЕНИЯ ──
-  let y = 82;
-  doc.setDrawColor(184, 151, 62);
-  doc.setFillColor(40, 30, 10);
-  doc.rect(15, y, 180, 8, 'F');
-  doc.setTextColor(245, 239, 224);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('НАЧИСЛЕНИЯ', 20, y + 5.5);
-  doc.text('Дней', 100, y + 5.5);
-  doc.text('Ставка', 125, y + 5.5);
-  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
+    <div style="background:#f5efe0;border:1px solid #b8973e;padding:14px 20px;margin:12px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-size:10px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:4px;">СОТРУДНИК</div>
+        <div style="font-size:15px;font-weight:bold;margin-bottom:4px;">${d.name}</div>
+        <div style="font-size:12px;color:#5a4a35;">Должность: ${d.position}</div>
+        <div style="font-size:12px;color:#5a4a35;">Подразделение: ${d.dept}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:4px;">ТАБ. №</div>
+        <div style="font-size:20px;font-weight:bold;">${d.tabnum}</div>
+        <div style="font-size:12px;color:#5a4a35;margin-top:6px;">Оклад: ${rub(d.salary)} руб.</div>
+      </div>
+    </div>
 
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'normal');
-  const accruals = [
-    ['Оклад (тарифная часть)', String(d.worked), r(d.salary/d.workdays) + '/дн.', r(d.base)],
-    d.overtime > 0 ? ['Сверхурочные (' + d.overtime + ' ч.)', '—', '1.5x / 2x', r(d.overtimePay)] : null,
-    d.night > 0    ? ['Доплата за ночные (' + d.night + ' ч.)', '—', '+20%', r(d.nightPay)] : null,
-    d.bonusPct > 0 ? ['Премия (' + d.bonusPct + '%)', '—', d.bonusPct + '%', r(d.bonus)] : null,
-  ].filter(Boolean);
+    <div style="margin:0 12px 10px;">
+      <div style="background:#1a1209;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">НАЧИСЛЕНИЯ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#3c2d0f;color:#f5efe0;font-size:10px;">
+            <th style="padding:6px 10px;border:1px solid #b8973e;text-align:left;">Вид начисления</th>
+            <th style="padding:6px 10px;border:1px solid #b8973e;">Дней</th>
+            <th style="padding:6px 10px;border:1px solid #b8973e;">Ставка</th>
+            <th style="padding:6px 10px;border:1px solid #b8973e;text-align:right;">Сумма, руб.</th>
+          </tr>
+        </thead>
+        <tbody>${accrualRows}</tbody>
+      </table>
+      <div style="background:#b8973e;padding:8px 10px;display:flex;justify-content:space-between;font-weight:bold;font-size:13px;">
+        <span>ИТОГО НАЧИСЛЕНО:</span>
+        <span>${rub(d.gross)} руб.</span>
+      </div>
+    </div>
 
-  y += 8;
-  accruals.forEach((row, i) => {
-    const bg = i % 2 === 0 ? [253, 248, 240] : [245, 239, 224];
-    doc.setFillColor(...bg);
-    doc.rect(15, y, 180, 7, 'F');
-    doc.setFontSize(8.5);
-    doc.text(row[0], 20, y + 5);
-    doc.text(row[1], 100, y + 5);
-    doc.text(row[2], 125, y + 5);
-    doc.text(row[3], 190, y + 5, { align: 'right' });
-    y += 7;
-  });
+    <div style="margin:0 12px 10px;">
+      <div style="background:#501e0a;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">УДЕРЖАНИЯ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#7a3015;color:#f5efe0;font-size:10px;">
+            <th style="padding:6px 10px;border:1px solid #c0704a;text-align:left;">Вид удержания</th>
+            <th style="padding:6px 10px;border:1px solid #c0704a;">База, руб.</th>
+            <th style="padding:6px 10px;border:1px solid #c0704a;">Ставка</th>
+            <th style="padding:6px 10px;border:1px solid #c0704a;text-align:right;">Сумма, руб.</th>
+          </tr>
+        </thead>
+        <tbody>${deductRows}</tbody>
+      </table>
+      <div style="background:#b05030;color:#fff;padding:8px 10px;display:flex;justify-content:space-between;font-weight:bold;font-size:13px;">
+        <span>ИТОГО УДЕРЖАНО:</span>
+        <span>${rub(d.ndfl)} руб.</span>
+      </div>
+    </div>
 
-  // Итого начислено
-  doc.setFillColor(184, 151, 62);
-  doc.rect(15, y, 180, 8, 'F');
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('ИТОГО НАЧИСЛЕНО:', 20, y + 5.5);
-  doc.text(r(d.gross) + ' руб.', 190, y + 5.5, { align: 'right' });
-  y += 14;
+    <div style="margin:0 12px 10px;">
+      <div style="background:#1e3250;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">СТРАХОВЫЕ ВЗНОСЫ (начисляет работодатель)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tbody>
+          <tr style="background:#f0f4fd;">
+            <td style="padding:6px 10px;border:1px solid #c0cce0;">Пенсионный фонд РФ (22%)</td>
+            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.pfr)} руб.</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 10px;border:1px solid #c0cce0;">ФОМС — медицинское страхование (5,1%)</td>
+            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.foms)} руб.</td>
+          </tr>
+          <tr style="background:#f0f4fd;">
+            <td style="padding:6px 10px;border:1px solid #c0cce0;">ФСС — социальное страхование (2,9%)</td>
+            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.fss)} руб.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-  // ── УДЕРЖАНИЯ ──
-  doc.setTextColor(26, 18, 9);
-  doc.setFillColor(80, 30, 10);
-  doc.rect(15, y, 180, 8, 'F');
-  doc.setTextColor(245, 239, 224);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('УДЕРЖАНИЯ', 20, y + 5.5);
-  doc.text('База, руб.', 110, y + 5.5);
-  doc.text('Ставка', 145, y + 5.5);
-  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
+    <div style="background:#1a1209;margin:0 12px 12px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#f5efe0;font-size:16px;font-weight:bold;letter-spacing:1px;">К ВЫПЛАТЕ:</span>
+      <span style="color:#b8973e;font-size:22px;font-weight:bold;">${rub(d.net)} руб.</span>
+    </div>
 
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'normal');
-  y += 8;
+    <div style="margin:0 12px 16px;padding:10px 0 0;border-top:1px solid #b8973e;font-size:10px;color:#5a4a35;">
+      <div style="margin-bottom:4px;">Расчётный листок выдан на основании ст. 136 ТК РФ.</div>
+      <div style="margin-bottom:10px;">Дата формирования: ${today}</div>
+      <div style="border-top:1px solid #333;padding-top:4px;display:inline-block;width:280px;text-align:center;font-size:11px;">Подпись главного бухгалтера</div>
+    </div>
 
-  const deductions = [
-    ['НДФЛ (налог на доходы физ. лиц)', r(d.gross - d.childDeduct), '13%', r(d.ndfl)],
-  ];
-  if (d.childDeduct > 0) {
-    deductions.unshift(['  Вычет на детей (' + (d.children >= 3 ? '3+' : d.children) + ' реб.)', '—', '—', '−' + r(d.childDeduct)]);
+  </div>`;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
+  wrapper.innerHTML = html;
+  document.body.appendChild(wrapper);
+
+  try {
+    const fileName = 'RaschetnyiList_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
+    await renderHtmlToPdf(wrapper.firstElementChild, 'portrait', fileName);
+  } finally {
+    document.body.removeChild(wrapper);
   }
-  deductions.forEach((row, i) => {
-    const bg = i % 2 === 0 ? [253, 248, 240] : [245, 239, 224];
-    doc.setFillColor(...bg);
-    doc.rect(15, y, 180, 7, 'F');
-    doc.setFontSize(8.5);
-    doc.text(row[0], 20, y + 5);
-    doc.text(row[1], 110, y + 5);
-    doc.text(row[2], 145, y + 5);
-    doc.text(row[3], 190, y + 5, { align: 'right' });
-    y += 7;
-  });
-
-  // Итого удержано
-  doc.setFillColor(180, 100, 80);
-  doc.rect(15, y, 180, 8, 'F');
-  doc.setTextColor(245, 239, 224);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('ИТОГО УДЕРЖАНО:', 20, y + 5.5);
-  doc.text(r(d.ndfl) + ' руб.', 190, y + 5.5, { align: 'right' });
-  y += 14;
-
-  // ── СТРАХОВЫЕ ВЗНОСЫ ──
-  doc.setTextColor(26, 18, 9);
-  doc.setFillColor(30, 50, 80);
-  doc.rect(15, y, 180, 8, 'F');
-  doc.setTextColor(245, 239, 224);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('СТРАХОВЫЕ ВЗНОСЫ (работодатель)', 20, y + 5.5);
-  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'normal');
-  y += 8;
-
-  const contrib = [
-    ['Пенсионный фонд РФ (22%)', r(d.pfr)],
-    ['ФОМС — медицинское страхование (5,1%)', r(d.foms)],
-    ['ФСС — социальное страхование (2,9%)', r(d.fss)],
-  ];
-  contrib.forEach((row, i) => {
-    const bg = i % 2 === 0 ? [240, 245, 253] : [232, 238, 248];
-    doc.setFillColor(...bg);
-    doc.rect(15, y, 180, 7, 'F');
-    doc.setFontSize(8.5);
-    doc.text(row[0], 20, y + 5);
-    doc.text(row[1], 190, y + 5, { align: 'right' });
-    y += 7;
-  });
-
-  // ── К ВЫПЛАТЕ ──
-  y += 6;
-  doc.setFillColor(26, 18, 9);
-  doc.rect(15, y, 180, 14, 'F');
-  doc.setTextColor(184, 151, 62);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.text('К ВЫПЛАТЕ:', 20, y + 9);
-  doc.setFontSize(14);
-  doc.text(r(d.net) + ' руб.', 190, y + 9, { align: 'right' });
-
-  // ── ПОДВАЛ ──
-  y += 22;
-  doc.setTextColor(26, 18, 9);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setDrawColor(184, 151, 62);
-  doc.setLineWidth(0.3);
-  doc.line(15, y, 195, y);
-  doc.text('Расчётный листок выдан на основании ст. 136 ТК РФ.', 15, y + 5);
-  doc.text('Дата формирования: ' + new Date().toLocaleDateString('ru-RU'), 15, y + 10);
-  doc.text('Подпись главного бухгалтера: _______________________', 15, y + 18);
-  doc.line(15, y + 23, 195, y + 23);
-
-  // ── СОХРАНЕНИЕ ──
-  const fileName = 'RaschetnyiList_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
-  doc.save(fileName);
 }
 
 /* ── INIT ── */
