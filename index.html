@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -561,6 +561,7 @@
   <a href="#architecture">Архитектура</a>
   <a href="#calculator">Калькулятор</a>
   <a href="#database">База данных</a>
+  <a href="#documents">Документы</a>
   <a href="#efficiency">Эффективность</a>
 </nav>
 
@@ -839,41 +840,87 @@
         <button class="btn btn-primary" onclick="addEmployee()">Добавить запись</button>
         <button class="btn" onclick="loadEmployees()">Обновить список</button>
       </div>
-      <!-- ДОКУМЕНТЫ -->
-      <div style="background:rgba(184,151,62,0.08); border:1px solid var(--divider); padding:32px; margin-top:32px;">
-        <h3 style="color:var(--gold-lt); margin-bottom:8px;">Сформировать документы</h3>
-        <p style="color:var(--warm-gray); font-size:14px; margin-bottom:20px;">Выберите сотрудника и период — документ скачается автоматически.</p>
-        <div class="form-row" style="margin-bottom:20px;">
-          <div class="field">
-            <label style="color:var(--gold-dk)">Сотрудник</label>
-            <select id="doc-employee"></select>
-          </div>
-          <div class="field">
-            <label style="color:var(--gold-dk)">Месяц</label>
-            <select id="doc-month">
-              <option value="1">Январь</option><option value="2">Февраль</option>
-              <option value="3">Март</option><option value="4">Апрель</option>
-              <option value="5">Май</option><option value="6">Июнь</option>
-              <option value="7">Июль</option><option value="8">Август</option>
-              <option value="9">Сентябрь</option><option value="10">Октябрь</option>
-              <option value="11">Ноябрь</option><option value="12">Декабрь</option>
-            </select>
-          </div>
-          <div class="field">
-            <label style="color:var(--gold-dk)">Год</label>
-            <input type="number" id="doc-year" value="2025" min="2020" max="2030">
-          </div>
-        </div>
-        <div class="btn-group">
-          <button class="btn btn-primary" onclick="createTimesheet()">Создать Табель</button>
-          <button class="btn" onclick="createPayslip()">Создать Расчётный лист</button>
-        </div>
-        <div id="doc-status" style="margin-top:16px; font-family:Cinzel,serif; font-size:10px; letter-spacing:2px; color:var(--gold-lt);"></div>
-      </div>
     </div>
   </div>
 
-  <!-- EFFICIENCY -->
+  <!-- PDF DOCUMENTS -->
+  <section id="documents" style="margin-top:80px;">
+    <div class="section-label">Модуль документов</div>
+    <h2>Формирование кадровых документов</h2>
+    <div class="divider"></div>
+    <p>Формирование табеля учёта рабочего времени (форма Т-13) и расчётного листка сотрудника с выгрузкой в PDF.</p>
+
+    <div class="calculator" style="margin-top:32px;">
+      <h3 style="margin-bottom:20px;">Параметры документа</h3>
+      <div class="form-row">
+        <div class="field">
+          <label>Сотрудник (ФИО)</label>
+          <input type="text" id="doc-name" value="Алсаев Станислав Александрович">
+        </div>
+        <div class="field">
+          <label>Должность</label>
+          <input type="text" id="doc-position" value="Инженер-механик">
+        </div>
+        <div class="field">
+          <label>Подразделение</label>
+          <input type="text" id="doc-dept" value="Производственный отдел">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Табельный номер</label>
+          <input type="text" id="doc-tabnum" value="00142">
+        </div>
+        <div class="field">
+          <label>Месяц и год</label>
+          <input type="month" id="doc-month" value="2025-01">
+        </div>
+        <div class="field">
+          <label>Оклад, руб.</label>
+          <input type="number" id="doc-salary" value="65000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Отработано дней</label>
+          <input type="number" id="doc-worked" value="17" min="0" max="31">
+        </div>
+        <div class="field">
+          <label>Рабочих дней в месяце</label>
+          <input type="number" id="doc-workdays" value="17" min="1" max="31">
+        </div>
+        <div class="field">
+          <label>Сверхурочные часы</label>
+          <input type="number" id="doc-overtime" value="4" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Ночные часы</label>
+          <input type="number" id="doc-night" value="0" min="0">
+        </div>
+        <div class="field">
+          <label>Премия, %</label>
+          <input type="number" id="doc-bonus" value="15" min="0">
+        </div>
+        <div class="field">
+          <label>Дети (вычет НДФЛ)</label>
+          <select id="doc-children">
+            <option value="0">Нет</option>
+            <option value="1">1 ребёнок</option>
+            <option value="2" selected>2 ребёнка</option>
+            <option value="3">3 и более</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-group" style="margin-top:32px;">
+        <button class="btn btn-primary" onclick="generateTimesheet()">Создать табель</button>
+        <button class="btn btn-primary" onclick="generatePayslip()">Создать расчётный лист</button>
+      </div>
+    </div>
+  </section>
+
+    <!-- EFFICIENCY -->
   <section id="efficiency" style="margin-top:80px;">
     <div class="section-label">Глава III § 1 · Эффективность</div>
     <h2>Прогнозная оценка экономической эффективности</h2>
@@ -930,50 +977,43 @@
 /* ── SUPABASE CONFIG ── */
 const SUPABASE_URL = 'https://zeytwxrugoketlirwbtw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao';
+
 let supabaseClient = null;
 
-/* ── ИНИЦИАЛИЗАЦИЯ SUPABASE ── */
-async function initSupabase() {
+function initSupabase() {
   try {
     supabaseClient = supabase.createClient('https://zeytwxrugoketlirwbtw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao');
-    const { data, error } = await supabaseClient.from('employees').select('id').limit(1);
-    if (error) throw error;
     setStatus('✦ Соединение установлено', 'ok');
     loadEmployees();
-    loadEmployeesForDocs();
   } catch(e) {
-    console.error('Supabase error:', e);
-    setStatus('✕ Работа в демо-режиме', 'err');
+    setStatus('✕ Ошибка подключения: ' + e.message, 'err');
     renderMockData();
-    loadEmployeesForDocs();
   }
 }
 
 function setStatus(msg, type) {
   const el = document.getElementById('db-status');
-  if (el) { el.textContent = msg; el.className = 'status-' + type; }
+  el.textContent = msg;
+  el.className = 'status-' + type;
 }
 
-/* ── МОК-ДАННЫЕ ── */
 const MOCK = [
-  { id:'0', full_name:'Морозов Алексей Сергеевич',    position:'Главный инженер',    department:'Производственный отдел', salary:95000, years_exp:8, tax_children:2 },
-  { id:'1', full_name:'Кузнецова Ирина Павловна',     position:'Главный бухгалтер',  department:'Бухгалтерия',            salary:85000, years_exp:6, tax_children:1 },
-  { id:'2', full_name:'Лебедев Дмитрий Вячеславович', position:'Инженер-механик',    department:'Производственный отдел', salary:68000, years_exp:4, tax_children:0 },
-  { id:'3', full_name:'Соловьёва Наталья Андреевна',  position:'HR-специалист',      department:'Отдел кадров',           salary:55000, years_exp:3, tax_children:2 },
-  { id:'4', full_name:'Попов Игорь Геннадьевич',      position:'Электрик',           department:'Производственный отдел', salary:62000, years_exp:5, tax_children:1 },
-  { id:'5', full_name:'Захарова Елена Михайловна',    position:'Менеджер по продажам',department:'Отдел продаж',          salary:58000, years_exp:2, tax_children:0 },
-  { id:'6', full_name:'Тихонов Артём Владимирович',   position:'Специалист по АСУ',  department:'Производственный отдел', salary:72000, years_exp:3, tax_children:1 },
-  { id:'7', full_name:'Белова Ольга Николаевна',      position:'Бухгалтер',          department:'Бухгалтерия',            salary:48000, years_exp:4, tax_children:3 },
+  { full_name:'Морозов Алексей Сергеевич', position:'Главный инженер', department:'Производственный отдел', salary:95000, years_exp:8 },
+  { full_name:'Кузнецова Ирина Павловна', position:'Главный бухгалтер', department:'Бухгалтерия', salary:85000, years_exp:6 },
+  { full_name:'Лебедев Дмитрий Вячеславович', position:'Инженер-механик', department:'Производственный отдел', salary:68000, years_exp:4 },
+  { full_name:'Соловьёва Наталья Андреевна', position:'HR-специалист', department:'Отдел кадров', salary:55000, years_exp:3 },
+  { full_name:'Попов Игорь Геннадьевич', position:'Электрик', department:'Производственный отдел', salary:62000, years_exp:5 },
 ];
 
-function renderMockData() { renderEmployees(MOCK); }
+function renderMockData() {
+  renderEmployees(MOCK);
+}
 
 function renderEmployees(data) {
   const list = document.getElementById('emp-list');
-  if (!list) return;
   const header = list.querySelector('.emp-row.header');
   list.innerHTML = '';
-  if (header) list.appendChild(header);
+  list.appendChild(header);
   if (!data || data.length === 0) {
     const empty = document.createElement('div');
     empty.style = 'padding:20px;color:var(--warm-gray);font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;';
@@ -981,22 +1021,26 @@ function renderEmployees(data) {
     list.appendChild(empty);
     return;
   }
-  data.forEach(function(emp) {
+  data.forEach(emp => {
     const row = document.createElement('div');
     row.className = 'emp-row';
-    row.innerHTML =
-      '<div class="emp-cell">' + emp.full_name + '</div>' +
-      '<div class="emp-cell">' + emp.position + '</div>' +
-      '<div class="emp-cell">' + emp.department + '</div>' +
-      '<div class="emp-cell">' + Number(emp.salary).toLocaleString('ru-RU') + '</div>' +
-      '<div class="emp-cell">' + (emp.years_exp || '—') + ' лет</div>';
+    row.innerHTML = `
+      <div class="emp-cell">${emp.full_name}</div>
+      <div class="emp-cell">${emp.position}</div>
+      <div class="emp-cell">${emp.department}</div>
+      <div class="emp-cell">${Number(emp.salary).toLocaleString('ru-RU')}</div>
+      <div class="emp-cell">${emp.years_exp || '—'} лет</div>
+    `;
     list.appendChild(row);
   });
 }
 
 async function loadEmployees() {
   if (!supabaseClient) { renderMockData(); return; }
-  const { data, error } = await supabaseClient.from('employees').select('*').order('full_name');
+  const { data, error } = await supabaseClient
+    .from('employees')
+    .select('*')
+    .order('full_name');
   if (error) { setStatus('✕ ' + error.message, 'err'); renderMockData(); return; }
   renderEmployees(data);
   setStatus('✦ Загружено ' + data.length + ' записей', 'ok');
@@ -1008,8 +1052,15 @@ async function addEmployee() {
   const dept = document.getElementById('emp-dept').value;
   const sal  = parseInt(document.getElementById('emp-salary').value);
   if (!name || !pos || !sal) { alert('Заполните все поля'); return; }
-  if (!supabaseClient) { MOCK.push({ id: String(MOCK.length), full_name:name, position:pos, department:dept, salary:sal, years_exp:0, tax_children:0 }); renderMockData(); return; }
-  const { error } = await supabaseClient.from('employees').insert([{ full_name:name, position:pos, department:dept, salary:sal, years_exp:0 }]);
+
+  if (!supabaseClient) {
+    MOCK.push({ full_name:name, position:pos, department:dept, salary:sal, years_exp:0 });
+    renderMockData();
+    return;
+  }
+  const { error } = await supabaseClient
+    .from('employees')
+    .insert([{ full_name:name, position:pos, department:dept, salary:sal, years_exp:0 }]);
   if (error) { alert('Ошибка: ' + error.message); return; }
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-position').value = '';
@@ -1017,61 +1068,76 @@ async function addEmployee() {
   loadEmployees();
 }
 
-/* ── КАЛЬКУЛЯТОР ── */
+/* ── CALCULATOR ── */
 function fmt(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
 
 function calculate() {
-  const salary    = +document.getElementById('salary').value        || 0;
-  const worked    = +document.getElementById('worked_days').value   || 0;
-  const workdays  = +document.getElementById('work_days').value     || 1;
-  const overtime  = +document.getElementById('overtime').value      || 0;
-  const night     = +document.getElementById('night').value         || 0;
-  const normHours = +document.getElementById('norm_hours').value    || 168;
-  const children  = +document.getElementById('children').value      || 0;
-  const bonusPct  = +document.getElementById('bonus_pct').value     || 0;
-  const holiday   = +document.getElementById('holiday').value       || 0;
-  const hourRate  = salary / normHours;
+  const salary      = +document.getElementById('salary').value;
+  const worked      = +document.getElementById('worked_days').value;
+  const workdays    = +document.getElementById('work_days').value;
+  const overtime    = +document.getElementById('overtime').value;
+  const night       = +document.getElementById('night').value;
+  const normHours   = +document.getElementById('norm_hours').value;
+  const children    = +document.getElementById('children').value;
+  const bonusPct    = +document.getElementById('bonus_pct').value;
+  const holiday     = +document.getElementById('holiday').value;
+
+  const hourRate = salary / normHours;
   const dailyRate = salary / workdays;
-  const base      = dailyRate * worked;
-  const ot1       = Math.min(overtime, 2) * hourRate * 1.5;
-  const ot2       = Math.max(0, overtime - 2) * hourRate * 2;
+
+  // Base pay
+  const base = dailyRate * worked;
+  // Overtime: first 2h * 1.5, rest * 2
+  const ot1 = Math.min(overtime, 2) * hourRate * 1.5;
+  const ot2 = Math.max(0, overtime - 2) * hourRate * 2;
   const overtimePay = ot1 + ot2;
-  const nightPay  = night * hourRate * 0.2;
+  // Night: 1.2x
+  const nightPay = night * hourRate * 0.2;
+  // Holiday: 2x extra
   const holidayPay = holiday * dailyRate;
-  const bonus     = base * bonusPct / 100;
-  const gross     = base + overtimePay + nightPay + holidayPay + bonus;
-  const childDeduct = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
-  const taxable   = Math.max(0, gross - childDeduct);
-  const ndfl      = taxable * 0.13;
-  const net       = gross - ndfl;
+  // Bonus
+  const bonus = base * bonusPct / 100;
+
+  const gross = base + overtimePay + nightPay + holidayPay + bonus;
+
+  // НДФЛ deduction per child
+  const childDeduct = children === 0 ? 0
+    : children === 1 ? 1400
+    : children === 2 ? 2800
+    : 5800; // 3+
+
+  const taxable = Math.max(0, gross - childDeduct);
+  const ndfl = taxable * 0.13;
+  const net  = gross - ndfl;
+
   document.getElementById('res-gross').textContent = fmt(gross);
   document.getElementById('res-ndfl').textContent  = fmt(ndfl);
   document.getElementById('res-net').textContent   = fmt(net);
 }
 
-/* ── ГРАФИК ЭФФЕКТИВНОСТИ ── */
+/* ── EFFICIENCY CHART ── */
 const chartData = [
   { label:'Табельный учёт', before:16, after:4 },
-  { label:'Расчёт премий',  before:12, after:3 },
-  { label:'Начисление ЗП',  before:28, after:18 },
-  { label:'Компенсации',    before:10, after:3 },
-  { label:'Удержания',      before:8,  after:2 },
-  { label:'Расч. листки',   before:4,  after:1 },
-  { label:'Отчётность',     before:9,  after:3 },
+  { label:'Расчёт премий', before:12, after:3 },
+  { label:'Начисление ЗП', before:28, after:18 },
+  { label:'Компенсации', before:10, after:3 },
+  { label:'Удержания', before:8, after:2 },
+  { label:'Расч. листки', before:4, after:1 },
+  { label:'Отчётность', before:9, after:3 },
 ];
 
 function buildChart() {
-  const maxVal = Math.max.apply(null, chartData.map(function(d){ return d.before; }));
-  const bars   = document.getElementById('chart-bars');
+  const maxVal = Math.max(...chartData.map(d => d.before));
+  const bars = document.getElementById('chart-bars');
   const labels = document.getElementById('chart-labels');
-  if (!bars || !labels) return;
   bars.innerHTML = ''; labels.innerHTML = '';
-  chartData.forEach(function(d) {
+  chartData.forEach(d => {
     const grp = document.createElement('div');
     grp.className = 'bar-group';
-    grp.innerHTML =
-      '<div class="bar bar-before" style="height:' + (d.before/maxVal*100) + '%" title="До: ' + d.before + ' ч/мес"></div>' +
-      '<div class="bar bar-after"  style="height:' + (d.after/maxVal*100)  + '%" title="После: ' + d.after + ' ч/мес"></div>';
+    grp.innerHTML = `
+      <div class="bar bar-before" style="height:${d.before/maxVal*100}%" title="До: ${d.before} ч/мес"></div>
+      <div class="bar bar-after"  style="height:${d.after/maxVal*100}%"  title="После: ${d.after} ч/мес"></div>
+    `;
     bars.appendChild(grp);
     const lbl = document.createElement('div');
     lbl.className = 'chart-label';
@@ -1080,305 +1146,419 @@ function buildChart() {
   });
 }
 
-/* ── ЗАГРУЗКА СОТРУДНИКОВ В СЕЛЕКТ ДОКУМЕНТОВ ── */
-async function loadEmployeesForDocs() {
-  let employees = [];
-  if (supabaseClient) {
-    const { data } = await supabaseClient.from('employees').select('id,full_name').order('full_name');
-    if (data && data.length > 0) employees = data;
-    else employees = MOCK;
-  } else {
-    employees = MOCK;
-  }
-  const sel = document.getElementById('doc-employee');
-  if (!sel) return;
-  sel.innerHTML = employees.map(function(e){ return '<option value="' + e.id + '">' + e.full_name + '</option>'; }).join('');
-}
+/* ── PDF HELPERS ── */
+function getDocData() {
+  const name     = document.getElementById('doc-name').value.trim() || 'Сотрудник';
+  const position = document.getElementById('doc-position').value.trim() || '—';
+  const dept     = document.getElementById('doc-dept').value.trim() || '—';
+  const tabnum   = document.getElementById('doc-tabnum').value.trim() || '—';
+  const monthVal = document.getElementById('doc-month').value;   // "2025-01"
+  const salary   = +document.getElementById('doc-salary').value  || 0;
+  const worked   = +document.getElementById('doc-worked').value  || 0;
+  const workdays = +document.getElementById('doc-workdays').value|| 1;
+  const overtime = +document.getElementById('doc-overtime').value|| 0;
+  const night    = +document.getElementById('doc-night').value   || 0;
+  const bonusPct = +document.getElementById('doc-bonus').value   || 0;
+  const children = +document.getElementById('doc-children').value|| 0;
 
-function docStatus(msg) {
-  const el = document.getElementById('doc-status');
-  if (el) el.textContent = msg;
-}
-
-/* ══════════════════════════════════════════════════════════
-   ГЕНЕРАЦИЯ PDF ЧЕРЕЗ html2pdf
-   Кириллица работает — рендерится как изображение из HTML
-   ══════════════════════════════════════════════════════════ */
-
-function getPdfOptions(filename, orientation) {
-  return {
-    margin:       10,
-    filename:     filename,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, logging: false },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: orientation }
-  };
-}
-
-/* ── СОЗДАТЬ ТАБЕЛЬ (PDF) ── */
-async function createTimesheet() {
-  const empId    = document.getElementById('doc-employee').value;
-  const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
-  const month    = +document.getElementById('doc-month').value;
-  const year     = +document.getElementById('doc-year').value;
-  const MONTHS   = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const monthName = MONTHS[month];
-
-  docStatus('⟳ Формирование табеля...');
-
-  let ts = null;
-  if (supabaseClient) {
-    const { data } = await supabaseClient.from('timesheets')
-      .select('*').eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single();
-    ts = data;
+  // Parse month label
+  let monthLabel = monthVal;
+  if (monthVal) {
+    const [y, m] = monthVal.split('-');
+    const months = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                    'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    monthLabel = (months[+m - 1] || m) + ' ' + y;
   }
 
-  const worked   = ts ? ts.worked_days   : 21;
-  const normDay  = ts ? ts.work_days     : 21;
-  const overtime = ts ? Number(ts.overtime_hrs)  : 0;
-  const night    = ts ? Number(ts.night_hrs)     : 0;
-  const sick     = ts ? ts.sick_days     : 0;
-  const vacation = ts ? ts.vacation_days : 0;
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const hourRate  = salary / (workdays * 8);
+  const dailyRate = salary / workdays;
+  const base      = dailyRate * worked;
+  const ot1       = Math.min(overtime, 2) * hourRate * 1.5;
+  const ot2       = Math.max(0, overtime - 2) * hourRate * 2;
+  const overtimePay = ot1 + ot2;
+  const nightPay  = night * hourRate * 0.2;
+  const bonus     = base * bonusPct / 100;
+  const gross     = base + overtimePay + nightPay + bonus;
+  const childDeduct = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+  const taxable   = Math.max(0, gross - childDeduct);
+  const ndfl      = taxable * 0.13;
+  const net       = gross - ndfl;
+  const pfr       = gross * 0.22;
+  const foms      = gross * 0.051;
+  const fss       = gross * 0.029;
 
-  // Строим строку дней и отметок
-  let daysHtml = '';
-  let marksHtml = '';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month-1, d).getDay();
-    const isWeekend = (dow === 0 || dow === 6);
-    const bg = isWeekend ? '#e8e0d0' : '#fff';
-    daysHtml  += '<td style="background:' + bg + ';font-weight:bold">' + d + '</td>';
-    marksHtml += '<td style="background:' + bg + '">' + (isWeekend ? 'В' : 'Я') + '</td>';
-  }
-
-  const html = `
-  <div style="font-family:Arial,sans-serif;font-size:11px;color:#000;padding:10px;width:1050px">
-    <h2 style="text-align:center;font-size:15px;margin:0 0 4px">ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ</h2>
-    <p style="text-align:center;font-size:10px;color:#555;margin:0 0 14px">Форма № Т-13 &nbsp;|&nbsp; ООО «ТехноСервис»</p>
-
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <tr>
-        <td style="padding:4px 8px;color:#666;width:160px">Сотрудник:</td>
-        <td style="padding:4px 8px;font-weight:bold">${empName}</td>
-        <td style="padding:4px 8px;color:#666;width:80px">Период:</td>
-        <td style="padding:4px 8px;font-weight:bold">${monthName} ${year} г.</td>
-        <td style="padding:4px 8px;color:#666;width:120px">Табельный №:</td>
-        <td style="padding:4px 8px;font-weight:bold">${empId.slice(0,8).toUpperCase()}</td>
-      </tr>
-    </table>
-
-    <p style="font-size:10px;font-weight:bold;margin:0 0 4px">Отметки за ${monthName} ${year}:</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:9px">
-      <thead>
-        <tr style="background:#1a1209;color:#fff">
-          <th style="padding:5px 4px;text-align:left;width:60px">Отметка</th>
-          ${daysHtml.replace(/(<td)/g, '<th').replace(/(<\/td>)/g, '</th>').replace(/style="/g, 'style="color:#fff;').replace(/background:#e8e0d0/g, 'background:#5a4a30').replace(/background:#fff/g, 'background:#1a1209')}
-        </tr>
-      </thead>
-      <tbody>
-        <tr style="text-align:center">
-          <td style="padding:5px 4px;font-weight:bold;background:#f5f0e8;text-align:left;border:1px solid #ccc">Явка/Отсутствие</td>
-          ${marksHtml.split('').join('').replace(/<td/g, '<td style="border:1px solid #ccc;padding:4px 2px;text-align:center"').replace(/<td style="background:(#e8e0d0|#fff);border/g, (m,bg) => '<td style="background:'+bg+';border')}
-        </tr>
-      </tbody>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px">
-      <thead>
-        <tr style="background:#1a1209;color:#fff;text-align:center">
-          <th style="padding:7px">Отработано дней</th>
-          <th style="padding:7px">Норма дней</th>
-          <th style="padding:7px">Сверхурочные, ч</th>
-          <th style="padding:7px">Ночные, ч</th>
-          <th style="padding:7px">Больничные, дн</th>
-          <th style="padding:7px">Отпуск, дн</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr style="text-align:center;font-weight:bold;background:#f9f6f0">
-          <td style="padding:8px;border:1px solid #ddd">${worked}</td>
-          <td style="padding:8px;border:1px solid #ddd">${normDay}</td>
-          <td style="padding:8px;border:1px solid #ddd">${overtime}</td>
-          <td style="padding:8px;border:1px solid #ddd">${night}</td>
-          <td style="padding:8px;border:1px solid #ddd">${sick}</td>
-          <td style="padding:8px;border:1px solid #ddd">${vacation}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p style="font-size:9px;color:#888;margin-bottom:20px">
-      Условные обозначения: Я — явка &nbsp; В — выходной &nbsp; Б — больничный &nbsp; ОТ — отпуск &nbsp; СВ — сверхурочные
-    </p>
-
-    <table style="width:100%;border-collapse:collapse">
-      <tr>
-        <td style="padding:5px 12px 5px 0;border-top:1px solid #000;font-size:9px;color:#555">Ответственный за ведение табеля</td>
-        <td style="padding:5px 12px 5px 0;border-top:1px solid #000;font-size:9px;color:#555">Руководитель подразделения</td>
-        <td style="padding:5px 0;border-top:1px solid #000;font-size:9px;color:#555">Работник отдела кадров</td>
-      </tr>
-    </table>
-  </div>`;
-
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  document.body.appendChild(container);
-
-  await html2pdf().set(getPdfOptions(
-    'Tabel_' + empName.split(' ')[0] + '_' + monthName + '_' + year + '.pdf', 'landscape'
-  )).from(container).save();
-
-  document.body.removeChild(container);
-  docStatus('✦ Табель сформирован и скачан');
+  return { name, position, dept, tabnum, monthLabel, salary, worked, workdays,
+           overtime, night, bonusPct, children, base, overtimePay, nightPay,
+           bonus, gross, ndfl, net, pfr, foms, fss, childDeduct };
 }
 
-/* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ (PDF) ── */
-async function createPayslip() {
-  const empId    = document.getElementById('doc-employee').value;
-  const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
-  const month    = +document.getElementById('doc-month').value;
-  const year     = +document.getElementById('doc-year').value;
-  const MONTHS   = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const monthName = MONTHS[month];
+function r(n) { return Math.round(n).toLocaleString('ru-RU'); }
 
-  docStatus('⟳ Формирование расчётного листа...');
+/* ── ТАБЕЛЬ ── */
+function generateTimesheet() {
+  if (typeof window.jspdf === 'undefined') {
+    alert('Библиотека jsPDF не загружена. Проверьте подключение к интернету.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const d = getDocData();
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  let pr = null, emp = null;
-  if (supabaseClient) {
-    const results = await Promise.all([
-      supabaseClient.from('payroll').select('*').eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
-      supabaseClient.from('employees').select('*').eq('id', empId).single()
-    ]);
-    pr  = results[0].data;
-    emp = results[1].data;
-  } else {
-    emp = MOCK.find(function(m){ return m.id === empId; }) || MOCK[0];
+  // Font — jsPDF built-in supports latin; for Cyrillic we use a workaround with canvas or encode manually.
+  // We use the standard helvetica but encode Russian via a simple map approach.
+  // Easiest reliable method: draw text as-is (jsPDF 2.x supports UTF-8 with standard fonts on modern browsers).
+  doc.setFont('helvetica', 'normal');
+
+  // ── ШАПКА ──
+  doc.setFontSize(10);
+  doc.text('ООО "ТехноСервис"', 148, 15, { align: 'center' });
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ', 148, 24, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Унифицированная форма № Т-13', 148, 30, { align: 'center' });
+
+  // Горизонтальная линия
+  doc.setLineWidth(0.5);
+  doc.line(15, 33, 282, 33);
+
+  // Инфо строки
+  doc.setFontSize(9);
+  doc.text('Период: ' + d.monthLabel, 15, 40);
+  doc.text('Подразделение: ' + d.dept, 15, 46);
+  doc.text('Табельный номер: ' + d.tabnum, 200, 40);
+
+  // ── ТАБЛИЦА СОТРУДНИКА ──
+  const tY = 52;
+  const cols = [15, 60, 110, 140, 165, 200, 230, 260, 282];
+  const headers = ['№', 'Сотрудник', 'Должность', 'Таб.№', 'Дней\nпо норме', 'Отработано\nдней', 'Сверхур.\nчасов', 'Ночных\nчасов', ''];
+
+  // Header row
+  doc.setFillColor(40, 30, 10);
+  doc.setTextColor(245, 239, 224);
+  doc.rect(cols[0], tY, cols[8]-cols[0], 12, 'F');
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  for (let i = 0; i < 8; i++) {
+    const cx = (cols[i] + cols[i+1]) / 2;
+    const lines = headers[i].split('\n');
+    lines.forEach((ln, li) => doc.text(ln, cx, tY + 4.5 + li * 3.5, { align: 'center' }));
   }
 
-  const salary    = emp ? Number(emp.salary)           : 65000;
-  const base      = pr  ? Number(pr.base_pay)          : salary;
-  const overtime  = pr  ? Number(pr.overtime_pay)      : 0;
-  const night     = pr  ? Number(pr.night_pay)         : 0;
-  const holiday   = pr  ? Number(pr.holiday_pay)       : 0;
-  const bonus     = pr  ? Number(pr.bonus)             : 0;
-  const sick      = pr  ? Number(pr.sick_pay)          : 0;
-  const vacation  = pr  ? Number(pr.vacation_pay)      : 0;
-  const gross     = pr  ? Number(pr.gross_total)       : base;
-  const ndfl      = pr  ? Number(pr.ndfl)              : Math.round(gross * 0.13);
-  const deduct    = pr  ? Number(pr.other_deductions)  : 0;
-  const net       = pr  ? Number(pr.net_pay)           : (gross - ndfl - deduct);
-  const insurance = pr  ? Number(pr.insurance_total)   : Math.round(gross * 0.30);
-  const children  = emp ? Number(emp.tax_children)     : 0;
-  const childDed  = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+  // Data row
+  doc.setTextColor(26, 18, 9);
+  doc.setFillColor(245, 239, 224);
+  doc.rect(cols[0], tY+12, cols[8]-cols[0], 10, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const rowData = ['1', d.name, d.position, d.tabnum,
+                   String(d.workdays), String(d.worked),
+                   String(d.overtime), String(d.night)];
+  for (let i = 0; i < 8; i++) {
+    const cx = (cols[i] + cols[i+1]) / 2;
+    doc.text(rowData[i], cx, tY + 18, { align: 'center' });
+  }
+  // Grid lines
+  doc.setLineWidth(0.3);
+  for (let i = 0; i < cols.length; i++) doc.line(cols[i], tY, cols[i], tY+22);
+  doc.line(cols[0], tY, cols[8], tY);
+  doc.line(cols[0], tY+12, cols[8], tY+12);
+  doc.line(cols[0], tY+22, cols[8], tY+22);
 
-  function r(n) { return Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' руб.'; }
+  // ── КАЛЕНДАРНАЯ СЕТКА ──
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Учёт рабочего времени по дням месяца:', 15, 85);
 
-  function accrualRow(label, amount) {
-    if (amount <= 0) return '';
-    return '<tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">' + label + '</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0;font-weight:bold">' + r(amount) + '</td></tr>';
+  const gridY = 90;
+  const cellW = 8.2;
+  const cellH = 8;
+  const daysInMonth = d.workdays + 6; // approximate total days
+  const actualDays = 31;
+
+  // Day headers
+  doc.setFillColor(60, 45, 15);
+  doc.setTextColor(245, 239, 224);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  for (let day = 1; day <= actualDays; day++) {
+    const x = 15 + (day-1) * cellW;
+    doc.rect(x, gridY, cellW, cellH*0.7, 'F');
+    doc.text(String(day), x + cellW/2, gridY + 4, { align: 'center' });
   }
 
-  const html = `
-  <div style="font-family:Arial,sans-serif;font-size:11px;color:#1a1209;padding:10px;width:600px">
-    <h2 style="text-align:center;font-size:16px;margin:0 0 3px;letter-spacing:1px">РАСЧЁТНЫЙ ЛИСТ</h2>
-    <p style="text-align:center;font-size:9px;color:#888;margin:0 0 16px">ООО «ТехноСервис» &nbsp;|&nbsp; ст. 136 ТК РФ</p>
+  // Hours row
+  doc.setFillColor(253, 248, 240);
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'normal');
+  for (let day = 1; day <= actualDays; day++) {
+    const x = 15 + (day-1) * cellW;
+    // Mark weekends (Sat=6, Sun=0) - approximate for Jan 2025
+    const isWeekend = (day % 7 === 0 || day % 7 === 6);
+    if (isWeekend) {
+      doc.setFillColor(220, 200, 160);
+    } else {
+      doc.setFillColor(253, 248, 240);
+    }
+    doc.rect(x, gridY + cellH*0.7, cellW, cellH, 'F');
+    if (!isWeekend && day <= d.worked) {
+      doc.text('8', x + cellW/2, gridY + cellH*0.7 + 5.5, { align: 'center' });
+    } else if (isWeekend) {
+      doc.text('В', x + cellW/2, gridY + cellH*0.7 + 5.5, { align: 'center' });
+    }
+    doc.rect(x, gridY + cellH*0.7, cellW, cellH, 'S');
+    doc.rect(x, gridY, cellW, cellH*0.7, 'S');
+  }
 
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px">
-      <tr><td style="padding:5px 0;color:#888;width:160px">Сотрудник:</td><td style="padding:5px 0;font-weight:bold">${empName}</td></tr>
-      <tr><td style="padding:5px 0;color:#888">Должность:</td><td style="padding:5px 0">${emp ? emp.position : '—'}</td></tr>
-      <tr><td style="padding:5px 0;color:#888">Подразделение:</td><td style="padding:5px 0">${emp ? emp.department : '—'}</td></tr>
-      <tr><td style="padding:5px 0;color:#888">Период:</td><td style="padding:5px 0;font-weight:bold">${monthName} ${year} г.</td></tr>
-      <tr><td style="padding:5px 0;color:#888">Оклад:</td><td style="padding:5px 0">${r(salary)}</td></tr>
-    </table>
+  // Legend
+  doc.setFontSize(8);
+  doc.setTextColor(26, 18, 9);
+  doc.text('8 — рабочий день (8 ч)   В — выходной день', 15, gridY + cellH*1.7 + 8);
 
-    <!-- НАЧИСЛЕНИЯ -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <thead>
-        <tr style="background:#1a1209;color:#fff">
-          <th style="padding:8px 10px;text-align:left">НАЧИСЛЕНИЯ</th>
-          <th style="padding:8px 10px;text-align:right">Сумма</th>
-        </tr>
-      </thead>
-      <tbody style="background:#fff">
-        ${accrualRow('Оплата по окладу (базовая)', base)}
-        ${accrualRow('Сверхурочные (ст. 152 ТК РФ)', overtime)}
-        ${accrualRow('Доплата за ночное время (ст. 154 ТК РФ)', night)}
-        ${accrualRow('Праздничные и выходные (ст. 153 ТК РФ)', holiday)}
-        ${accrualRow('Премия', bonus)}
-        ${accrualRow('Пособие по нетрудоспособности', sick)}
-        ${accrualRow('Отпускные', vacation)}
-        <tr style="background:#f5f0e8">
-          <td style="padding:8px 10px;font-weight:bold">ИТОГО НАЧИСЛЕНО (gross)</td>
-          <td style="padding:8px 10px;text-align:right;font-weight:bold">${r(gross)}</td>
-        </tr>
-      </tbody>
-    </table>
+  // ── ИТОГИ ──
+  const sumY = gridY + cellH*1.7 + 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('ИТОГИ ЗА ПЕРИОД:', 15, sumY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
 
-    <!-- УДЕРЖАНИЯ -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <thead>
-        <tr style="background:#1a1209;color:#fff">
-          <th style="padding:8px 10px;text-align:left">УДЕРЖАНИЯ</th>
-          <th style="padding:8px 10px;text-align:right">Сумма</th>
-        </tr>
-      </thead>
-      <tbody style="background:#fff">
-        <tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">Стандартный вычет на детей (${children} реб.)</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0">${r(childDed)}</td></tr>
-        <tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">НДФЛ 13%</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0;font-weight:bold">${r(ndfl)}</td></tr>
-        ${deduct > 0 ? '<tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">Прочие удержания</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0">' + r(deduct) + '</td></tr>' : ''}
-        <tr style="background:#f5f0e8">
-          <td style="padding:8px 10px;font-weight:bold">ИТОГО УДЕРЖАНО</td>
-          <td style="padding:8px 10px;text-align:right;font-weight:bold">${r(ndfl + deduct)}</td>
-        </tr>
-      </tbody>
-    </table>
+  const items = [
+    ['Рабочих дней по норме:', d.workdays + ' дн.'],
+    ['Фактически отработано:', d.worked + ' дн. / ' + (d.worked * 8) + ' ч.'],
+    ['Сверхурочные часы:', d.overtime + ' ч.'],
+    ['Ночные часы:', d.night + ' ч.'],
+    ['Итого часов:', (d.worked * 8 + d.overtime) + ' ч.'],
+  ];
+  items.forEach(([label, val], i) => {
+    doc.text(label, 15, sumY + 8 + i * 6);
+    doc.text(val, 100, sumY + 8 + i * 6);
+  });
 
-    <!-- К ВЫПЛАТЕ -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <tr style="background:#1a1209;color:#f5d77a">
-        <td style="padding:12px 10px;font-size:14px;font-weight:bold;letter-spacing:1px">К ВЫПЛАТЕ (net)</td>
-        <td style="padding:12px 10px;font-size:14px;font-weight:bold;text-align:right">${r(net)}</td>
-      </tr>
-    </table>
+  // ── ПОДПИСИ ──
+  const sigY = sumY + 50;
+  doc.setLineWidth(0.3);
+  doc.line(15, sigY, 90, sigY);
+  doc.line(120, sigY, 195, sigY);
+  doc.line(210, sigY, 282, sigY);
+  doc.setFontSize(8);
+  doc.text('Руководитель подразделения', 15, sigY + 4);
+  doc.text('Работник отдела кадров', 120, sigY + 4);
+  doc.text('Дата составления: ___________', 210, sigY + 4);
 
-    <!-- СТРАХОВЫЕ ВЗНОСЫ -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-      <thead>
-        <tr style="background:#5a4a30;color:#fff">
-          <th style="padding:7px 10px;text-align:left">СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)</th>
-          <th style="padding:7px 10px;text-align:right">Сумма</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr style="background:#faf7f2">
-          <td style="padding:7px 10px">Взносы 30% (ОПС, ОМС, ОСС)</td>
-          <td style="padding:7px 10px;text-align:right">${r(insurance)}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p style="font-size:8px;color:#aaa;text-align:center;margin-top:10px">
-      Сформировано: ${new Date().toLocaleDateString('ru-RU')} &nbsp;|&nbsp; ИС Учёта Труда &nbsp;|&nbsp; ООО «ТехноСервис»
-    </p>
-  </div>`;
-
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  document.body.appendChild(container);
-
-  await html2pdf().set(getPdfOptions(
-    'RaschetnyiList_' + empName.split(' ')[0] + '_' + monthName + '_' + year + '.pdf', 'portrait'
-  )).from(container).save();
-
-  document.body.removeChild(container);
-  docStatus('✦ Расчётный лист сформирован и скачан');
+  // ── СОХРАНЕНИЕ ──
+  const fileName = 'Tabel_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
+  doc.save(fileName);
 }
 
-/* ── ЗАПУСК ── */
+/* ── РАСЧЁТНЫЙ ЛИСТ ── */
+function generatePayslip() {
+  if (typeof window.jspdf === 'undefined') {
+    alert('Библиотека jsPDF не загружена. Проверьте подключение к интернету.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const d = getDocData();
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  doc.setFont('helvetica', 'normal');
+
+  // ── ШАПКА ──
+  doc.setFillColor(26, 18, 9);
+  doc.rect(0, 0, 210, 38, 'F');
+  doc.setTextColor(245, 239, 224);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('ООО "ТехноСервис" · ИНН 5260000000', 105, 10, { align: 'center' });
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('РАСЧЁТНЫЙ ЛИСТОК', 105, 20, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('за ' + d.monthLabel, 105, 28, { align: 'center' });
+  doc.setTextColor(184, 151, 62);
+  doc.text('Документ сформирован автоматически информационной системой', 105, 35, { align: 'center' });
+
+  // ── ДАННЫЕ СОТРУДНИКА ──
+  doc.setTextColor(26, 18, 9);
+  doc.setFillColor(245, 239, 224);
+  doc.rect(15, 44, 180, 28, 'F');
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(184, 151, 62);
+  doc.rect(15, 44, 180, 28, 'S');
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('СОТРУДНИК', 20, 51);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(d.name, 20, 58);
+  doc.setFontSize(9);
+  doc.text('Должность: ' + d.position, 20, 64);
+  doc.text('Подразделение: ' + d.dept, 20, 70);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('Табельный №:', 140, 51);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.text(d.tabnum, 140, 60);
+  doc.setFontSize(9);
+  doc.text('Оклад: ' + r(d.salary) + ' руб.', 140, 67);
+
+  // ── НАЧИСЛЕНИЯ ──
+  let y = 82;
+  doc.setDrawColor(184, 151, 62);
+  doc.setFillColor(40, 30, 10);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(245, 239, 224);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('НАЧИСЛЕНИЯ', 20, y + 5.5);
+  doc.text('Дней', 100, y + 5.5);
+  doc.text('Ставка', 125, y + 5.5);
+  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
+
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'normal');
+  const accruals = [
+    ['Оклад (тарифная часть)', String(d.worked), r(d.salary/d.workdays) + '/дн.', r(d.base)],
+    d.overtime > 0 ? ['Сверхурочные (' + d.overtime + ' ч.)', '—', '1.5x / 2x', r(d.overtimePay)] : null,
+    d.night > 0    ? ['Доплата за ночные (' + d.night + ' ч.)', '—', '+20%', r(d.nightPay)] : null,
+    d.bonusPct > 0 ? ['Премия (' + d.bonusPct + '%)', '—', d.bonusPct + '%', r(d.bonus)] : null,
+  ].filter(Boolean);
+
+  y += 8;
+  accruals.forEach((row, i) => {
+    const bg = i % 2 === 0 ? [253, 248, 240] : [245, 239, 224];
+    doc.setFillColor(...bg);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.setFontSize(8.5);
+    doc.text(row[0], 20, y + 5);
+    doc.text(row[1], 100, y + 5);
+    doc.text(row[2], 125, y + 5);
+    doc.text(row[3], 190, y + 5, { align: 'right' });
+    y += 7;
+  });
+
+  // Итого начислено
+  doc.setFillColor(184, 151, 62);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('ИТОГО НАЧИСЛЕНО:', 20, y + 5.5);
+  doc.text(r(d.gross) + ' руб.', 190, y + 5.5, { align: 'right' });
+  y += 14;
+
+  // ── УДЕРЖАНИЯ ──
+  doc.setTextColor(26, 18, 9);
+  doc.setFillColor(80, 30, 10);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(245, 239, 224);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('УДЕРЖАНИЯ', 20, y + 5.5);
+  doc.text('База, руб.', 110, y + 5.5);
+  doc.text('Ставка', 145, y + 5.5);
+  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
+
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'normal');
+  y += 8;
+
+  const deductions = [
+    ['НДФЛ (налог на доходы физ. лиц)', r(d.gross - d.childDeduct), '13%', r(d.ndfl)],
+  ];
+  if (d.childDeduct > 0) {
+    deductions.unshift(['  Вычет на детей (' + (d.children >= 3 ? '3+' : d.children) + ' реб.)', '—', '—', '−' + r(d.childDeduct)]);
+  }
+  deductions.forEach((row, i) => {
+    const bg = i % 2 === 0 ? [253, 248, 240] : [245, 239, 224];
+    doc.setFillColor(...bg);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.setFontSize(8.5);
+    doc.text(row[0], 20, y + 5);
+    doc.text(row[1], 110, y + 5);
+    doc.text(row[2], 145, y + 5);
+    doc.text(row[3], 190, y + 5, { align: 'right' });
+    y += 7;
+  });
+
+  // Итого удержано
+  doc.setFillColor(180, 100, 80);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(245, 239, 224);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('ИТОГО УДЕРЖАНО:', 20, y + 5.5);
+  doc.text(r(d.ndfl) + ' руб.', 190, y + 5.5, { align: 'right' });
+  y += 14;
+
+  // ── СТРАХОВЫЕ ВЗНОСЫ ──
+  doc.setTextColor(26, 18, 9);
+  doc.setFillColor(30, 50, 80);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(245, 239, 224);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('СТРАХОВЫЕ ВЗНОСЫ (работодатель)', 20, y + 5.5);
+  doc.text('Сумма, руб.', 165, y + 5.5, { align: 'right' });
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'normal');
+  y += 8;
+
+  const contrib = [
+    ['Пенсионный фонд РФ (22%)', r(d.pfr)],
+    ['ФОМС — медицинское страхование (5,1%)', r(d.foms)],
+    ['ФСС — социальное страхование (2,9%)', r(d.fss)],
+  ];
+  contrib.forEach((row, i) => {
+    const bg = i % 2 === 0 ? [240, 245, 253] : [232, 238, 248];
+    doc.setFillColor(...bg);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.setFontSize(8.5);
+    doc.text(row[0], 20, y + 5);
+    doc.text(row[1], 190, y + 5, { align: 'right' });
+    y += 7;
+  });
+
+  // ── К ВЫПЛАТЕ ──
+  y += 6;
+  doc.setFillColor(26, 18, 9);
+  doc.rect(15, y, 180, 14, 'F');
+  doc.setTextColor(184, 151, 62);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('К ВЫПЛАТЕ:', 20, y + 9);
+  doc.setFontSize(14);
+  doc.text(r(d.net) + ' руб.', 190, y + 9, { align: 'right' });
+
+  // ── ПОДВАЛ ──
+  y += 22;
+  doc.setTextColor(26, 18, 9);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setDrawColor(184, 151, 62);
+  doc.setLineWidth(0.3);
+  doc.line(15, y, 195, y);
+  doc.text('Расчётный листок выдан на основании ст. 136 ТК РФ.', 15, y + 5);
+  doc.text('Дата формирования: ' + new Date().toLocaleDateString('ru-RU'), 15, y + 10);
+  doc.text('Подпись главного бухгалтера: _______________________', 15, y + 18);
+  doc.line(15, y + 23, 195, y + 23);
+
+  // ── СОХРАНЕНИЕ ──
+  const fileName = 'RaschetnyiList_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
+  doc.save(fileName);
+}
+
+/* ── INIT ── */
 buildChart();
 calculate();
 document.querySelectorAll('#salary,#worked_days,#work_days,#overtime,#night,#norm_hours,#children,#bonus_pct,#holiday')
-  .forEach(function(el){ el.addEventListener('input', calculate); });
+  .forEach(el => el.addEventListener('input', calculate));
+
 initSupabase();
 </script>
 </body>
