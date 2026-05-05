@@ -1212,23 +1212,23 @@ async function renderHtmlToPdf(el, orientation, fileName) {
   const pageH    = isLand ? 210 : 297;
   const pdf      = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
 
-  const imgW = pageW - 10;
-  const imgH = (canvas.height / canvas.width) * imgW;
+  const margin   = 8;
+  const maxW     = pageW - margin * 2;
+  const maxH     = pageH - margin * 2;
 
-  if (imgH <= pageH - 10) {
-    pdf.addImage(imgData, 'PNG', 5, 5, imgW, imgH);
-  } else {
-    // Многостраничный вывод
-    let remainH = imgH;
-    let posY = 0;
-    const sliceH = pageH - 10;
-    while (remainH > 0) {
-      pdf.addImage(imgData, 'PNG', 5, 5 - posY, imgW, imgH);
-      remainH -= sliceH;
-      posY    += sliceH;
-      if (remainH > 0) pdf.addPage();
-    }
+  // Вычисляем размер изображения с учётом пропорций
+  let imgW = maxW;
+  let imgH = (canvas.height / canvas.width) * imgW;
+
+  // Если не вмещается по высоте — уменьшаем масштаб чтобы всё влезло на 1 страницу
+  if (imgH > maxH) {
+    imgH = maxH;
+    imgW = (canvas.width / canvas.height) * imgH;
   }
+
+  // Центрируем по горизонтали
+  const offsetX = margin + (maxW - imgW) / 2;
+  pdf.addImage(imgData, 'PNG', offsetX, margin, imgW, imgH);
 
   pdf.save(fileName);
 }
@@ -1356,142 +1356,144 @@ async function generatePayslip() {
 
   let accrualRows = `
     <tr style="background:#fdf8f0;">
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Оклад (тарифная часть)</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${d.worked}</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${rub(d.dailyRate)}/дн.</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.base)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Оклад (тарифная часть)</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${d.worked}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${rub(d.dailyRate)}/дн.</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.base)}</td>
     </tr>`;
   if (d.overtime > 0) accrualRows += `
     <tr>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Сверхурочные (${d.overtime} ч.)</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">1,5x / 2x</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.overtimePay)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Сверхурочные (${d.overtime} ч.)</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">1,5x / 2x</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.overtimePay)}</td>
     </tr>`;
   if (d.night > 0) accrualRows += `
     <tr style="background:#fdf8f0;">
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Доплата за ночные (${d.night} ч.)</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">+20%</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.nightPay)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Доплата за ночные (${d.night} ч.)</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">+20%</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.nightPay)}</td>
     </tr>`;
   if (d.bonusPct > 0) accrualRows += `
     <tr>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Премия (${d.bonusPct}%)</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${d.bonusPct}%</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.bonus)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Премия (${d.bonusPct}%)</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${d.bonusPct}%</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.bonus)}</td>
     </tr>`;
 
   let deductRows = '';
   if (d.childDeduct > 0) deductRows += `
     <tr style="background:#fdf8f0;">
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">Налоговый вычет на детей (${childLabel})</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;color:#2c6b22;font-weight:bold;">−${rub(d.childDeduct)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Налоговый вычет на детей (${childLabel})</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;color:#2c6b22;font-weight:bold;">−${rub(d.childDeduct)}</td>
     </tr>`;
   deductRows += `
     <tr>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;">НДФЛ (налог на доходы физических лиц)</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">${rub(d.gross - d.childDeduct)}</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:center;">13%</td>
-      <td style="padding:7px 10px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.ndfl)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;">НДФЛ (налог на доходы физических лиц)</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${rub(d.gross - d.childDeduct)}</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">13%</td>
+      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.ndfl)}</td>
     </tr>`;
 
   const today = new Date().toLocaleDateString('ru-RU');
 
   const html = `
-  <div style="font-family:'Arial',sans-serif;padding:0;background:#fff;width:680px;color:#1a1209;">
+  <div style="font-family:'Arial',sans-serif;padding:0;background:#fff;width:640px;color:#1a1209;">
 
-    <div style="background:#1a1209;color:#f5efe0;padding:18px 24px;text-align:center;">
-      <div style="font-size:11px;margin-bottom:4px;">ООО «ТехноСервис» · ИНН 5260000000</div>
-      <div style="font-size:20px;font-weight:bold;margin-bottom:4px;">РАСЧЁТНЫЙ ЛИСТОК</div>
-      <div style="font-size:13px;margin-bottom:4px;">за ${d.monthLabel}</div>
-      <div style="font-size:10px;color:#b8973e;">Документ сформирован автоматически информационной системой</div>
+    <div style="background:#1a1209;color:#f5efe0;padding:12px 20px;text-align:center;">
+      <div style="font-size:10px;margin-bottom:2px;">ООО «ТехноСервис» · ИНН 5260000000</div>
+      <div style="font-size:17px;font-weight:bold;margin-bottom:2px;">РАСЧЁТНЫЙ ЛИСТОК</div>
+      <div style="font-size:11px;margin-bottom:2px;">за ${d.monthLabel}</div>
+      <div style="font-size:9px;color:#b8973e;">Документ сформирован автоматически информационной системой</div>
     </div>
 
-    <div style="background:#f5efe0;border:1px solid #b8973e;padding:14px 20px;margin:12px;display:flex;justify-content:space-between;align-items:flex-start;">
+    <div style="background:#f5efe0;border:1px solid #b8973e;padding:8px 14px;margin:8px;display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <div style="font-size:10px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:4px;">СОТРУДНИК</div>
-        <div style="font-size:15px;font-weight:bold;margin-bottom:4px;">${d.name}</div>
-        <div style="font-size:12px;color:#5a4a35;">Должность: ${d.position}</div>
-        <div style="font-size:12px;color:#5a4a35;">Подразделение: ${d.dept}</div>
+        <div style="font-size:9px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:2px;">СОТРУДНИК</div>
+        <div style="font-size:13px;font-weight:bold;margin-bottom:2px;">${d.name}</div>
+        <div style="font-size:11px;color:#5a4a35;">Должность: ${d.position}</div>
+        <div style="font-size:11px;color:#5a4a35;">Подразделение: ${d.dept}</div>
       </div>
       <div style="text-align:right;">
-        <div style="font-size:10px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:4px;">ТАБ. №</div>
-        <div style="font-size:20px;font-weight:bold;">${d.tabnum}</div>
-        <div style="font-size:12px;color:#5a4a35;margin-top:6px;">Оклад: ${rub(d.salary)} руб.</div>
+        <div style="font-size:9px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:2px;">ТАБ. №</div>
+        <div style="font-size:17px;font-weight:bold;">${d.tabnum}</div>
+        <div style="font-size:11px;color:#5a4a35;margin-top:4px;">Оклад: ${rub(d.salary)} руб.</div>
       </div>
     </div>
 
-    <div style="margin:0 12px 10px;">
-      <div style="background:#1a1209;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">НАЧИСЛЕНИЯ</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <div style="margin:0 8px 7px;">
+      <div style="background:#1a1209;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">НАЧИСЛЕНИЯ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
-          <tr style="background:#3c2d0f;color:#f5efe0;font-size:10px;">
-            <th style="padding:6px 10px;border:1px solid #b8973e;text-align:left;">Вид начисления</th>
-            <th style="padding:6px 10px;border:1px solid #b8973e;">Дней</th>
-            <th style="padding:6px 10px;border:1px solid #b8973e;">Ставка</th>
-            <th style="padding:6px 10px;border:1px solid #b8973e;text-align:right;">Сумма, руб.</th>
+          <tr style="background:#3c2d0f;color:#f5efe0;font-size:9px;">
+            <th style="padding:4px 8px;border:1px solid #b8973e;text-align:left;">Вид начисления</th>
+            <th style="padding:4px 8px;border:1px solid #b8973e;">Дней</th>
+            <th style="padding:4px 8px;border:1px solid #b8973e;">Ставка</th>
+            <th style="padding:4px 8px;border:1px solid #b8973e;text-align:right;">Сумма, руб.</th>
           </tr>
         </thead>
         <tbody>${accrualRows}</tbody>
       </table>
-      <div style="background:#b8973e;padding:8px 10px;display:flex;justify-content:space-between;font-weight:bold;font-size:13px;">
+      <div style="background:#b8973e;padding:5px 8px;display:flex;justify-content:space-between;font-weight:bold;font-size:12px;">
         <span>ИТОГО НАЧИСЛЕНО:</span>
         <span>${rub(d.gross)} руб.</span>
       </div>
     </div>
 
-    <div style="margin:0 12px 10px;">
-      <div style="background:#501e0a;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">УДЕРЖАНИЯ</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <div style="margin:0 8px 7px;">
+      <div style="background:#501e0a;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">УДЕРЖАНИЯ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
-          <tr style="background:#7a3015;color:#f5efe0;font-size:10px;">
-            <th style="padding:6px 10px;border:1px solid #c0704a;text-align:left;">Вид удержания</th>
-            <th style="padding:6px 10px;border:1px solid #c0704a;">База, руб.</th>
-            <th style="padding:6px 10px;border:1px solid #c0704a;">Ставка</th>
-            <th style="padding:6px 10px;border:1px solid #c0704a;text-align:right;">Сумма, руб.</th>
+          <tr style="background:#7a3015;color:#f5efe0;font-size:9px;">
+            <th style="padding:4px 8px;border:1px solid #c0704a;text-align:left;">Вид удержания</th>
+            <th style="padding:4px 8px;border:1px solid #c0704a;">База, руб.</th>
+            <th style="padding:4px 8px;border:1px solid #c0704a;">Ставка</th>
+            <th style="padding:4px 8px;border:1px solid #c0704a;text-align:right;">Сумма, руб.</th>
           </tr>
         </thead>
         <tbody>${deductRows}</tbody>
       </table>
-      <div style="background:#b05030;color:#fff;padding:8px 10px;display:flex;justify-content:space-between;font-weight:bold;font-size:13px;">
+      <div style="background:#b05030;color:#fff;padding:5px 8px;display:flex;justify-content:space-between;font-weight:bold;font-size:12px;">
         <span>ИТОГО УДЕРЖАНО:</span>
         <span>${rub(d.ndfl)} руб.</span>
       </div>
     </div>
 
-    <div style="margin:0 12px 10px;">
-      <div style="background:#1e3250;color:#f5efe0;padding:8px 10px;font-size:11px;font-weight:bold;letter-spacing:1px;">СТРАХОВЫЕ ВЗНОСЫ (начисляет работодатель)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <div style="margin:0 8px 7px;">
+      <div style="background:#1e3250;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">СТРАХОВЫЕ ВЗНОСЫ (начисляет работодатель)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <tbody>
           <tr style="background:#f0f4fd;">
-            <td style="padding:6px 10px;border:1px solid #c0cce0;">Пенсионный фонд РФ (22%)</td>
-            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.pfr)} руб.</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;">Пенсионный фонд РФ (22%)</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.pfr)} руб.</td>
           </tr>
           <tr>
-            <td style="padding:6px 10px;border:1px solid #c0cce0;">ФОМС — медицинское страхование (5,1%)</td>
-            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.foms)} руб.</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;">ФОМС — медицинское страхование (5,1%)</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.foms)} руб.</td>
           </tr>
           <tr style="background:#f0f4fd;">
-            <td style="padding:6px 10px;border:1px solid #c0cce0;">ФСС — социальное страхование (2,9%)</td>
-            <td style="padding:6px 10px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.fss)} руб.</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;">ФСС — социальное страхование (2,9%)</td>
+            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.fss)} руб.</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div style="background:#1a1209;margin:0 12px 12px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#f5efe0;font-size:16px;font-weight:bold;letter-spacing:1px;">К ВЫПЛАТЕ:</span>
-      <span style="color:#b8973e;font-size:22px;font-weight:bold;">${rub(d.net)} руб.</span>
+    <div style="background:#1a1209;margin:0 8px 8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#f5efe0;font-size:14px;font-weight:bold;letter-spacing:1px;">К ВЫПЛАТЕ:</span>
+      <span style="color:#b8973e;font-size:19px;font-weight:bold;">${rub(d.net)} руб.</span>
     </div>
 
-    <div style="margin:0 12px 16px;padding:10px 0 0;border-top:1px solid #b8973e;font-size:10px;color:#5a4a35;">
-      <div style="margin-bottom:4px;">Расчётный листок выдан на основании ст. 136 ТК РФ.</div>
-      <div style="margin-bottom:10px;">Дата формирования: ${today}</div>
-      <div style="border-top:1px solid #333;padding-top:4px;display:inline-block;width:280px;text-align:center;font-size:11px;">Подпись главного бухгалтера</div>
+    <div style="margin:0 8px 10px;padding:7px 0 0;border-top:1px solid #b8973e;font-size:9px;color:#5a4a35;display:flex;justify-content:space-between;align-items:flex-end;">
+      <div>
+        <div style="margin-bottom:2px;">Расчётный листок выдан на основании ст. 136 ТК РФ.</div>
+        <div>Дата формирования: ${today}</div>
+      </div>
+      <div style="border-top:1px solid #333;padding-top:3px;width:240px;text-align:center;font-size:10px;">Подпись главного бухгалтера</div>
     </div>
 
   </div>`;
