@@ -1346,169 +1346,303 @@ async function generateTimesheet() {
 }
 
 /* ── РАСЧЁТНЫЙ ЛИСТ ── */
-async function generatePayslip() {
-  if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
-    alert('Библиотеки PDF не загружены. Проверьте подключение к интернету.');
-    return;
-  }
+function generatePayslip() {
   const d = getDocData();
   const childLabel = d.children === 0 ? 'нет' : d.children === 1 ? '1 ребёнок' : d.children === 2 ? '2 ребёнка' : '3 и более';
 
   let accrualRows = `
-    <tr style="background:#fdf8f0;">
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Оклад (тарифная часть)</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${d.worked}</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${rub(d.dailyRate)}/дн.</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.base)}</td>
+    <tr class="row-alt">
+      <td>Оклад (тарифная часть)</td>
+      <td class="center">${d.worked}</td>
+      <td class="center">${rub(d.dailyRate)}/дн.</td>
+      <td class="right bold">${rub(d.base)}</td>
     </tr>`;
   if (d.overtime > 0) accrualRows += `
     <tr>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Сверхурочные (${d.overtime} ч.)</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">1,5x / 2x</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.overtimePay)}</td>
+      <td>Сверхурочные (${d.overtime} ч.)</td>
+      <td class="center">—</td>
+      <td class="center">1,5x / 2x</td>
+      <td class="right bold">${rub(d.overtimePay)}</td>
     </tr>`;
   if (d.night > 0) accrualRows += `
-    <tr style="background:#fdf8f0;">
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Доплата за ночные (${d.night} ч.)</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">+20%</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.nightPay)}</td>
+    <tr class="row-alt">
+      <td>Доплата за ночные (${d.night} ч.)</td>
+      <td class="center">—</td>
+      <td class="center">+20%</td>
+      <td class="right bold">${rub(d.nightPay)}</td>
     </tr>`;
   if (d.bonusPct > 0) accrualRows += `
     <tr>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Премия (${d.bonusPct}%)</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${d.bonusPct}%</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.bonus)}</td>
+      <td>Премия (${d.bonusPct}%)</td>
+      <td class="center">—</td>
+      <td class="center">${d.bonusPct}%</td>
+      <td class="right bold">${rub(d.bonus)}</td>
     </tr>`;
 
   let deductRows = '';
   if (d.childDeduct > 0) deductRows += `
-    <tr style="background:#fdf8f0;">
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">Налоговый вычет на детей (${childLabel})</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">—</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;color:#2c6b22;font-weight:bold;">−${rub(d.childDeduct)}</td>
+    <tr class="row-alt">
+      <td>Налоговый вычет на детей (${childLabel})</td>
+      <td class="center">—</td>
+      <td class="center">—</td>
+      <td class="right bold green">−${rub(d.childDeduct)}</td>
     </tr>`;
   deductRows += `
     <tr>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;">НДФЛ (налог на доходы физических лиц)</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">${rub(d.gross - d.childDeduct)}</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:center;">13%</td>
-      <td style="padding:4px 8px;border:1px solid #e0d5c0;text-align:right;font-weight:bold;">${rub(d.ndfl)}</td>
+      <td>НДФЛ (налог на доходы физических лиц)</td>
+      <td class="center">${rub(d.gross - d.childDeduct)}</td>
+      <td class="center">13%</td>
+      <td class="right bold">${rub(d.ndfl)}</td>
     </tr>`;
 
   const today = new Date().toLocaleDateString('ru-RU');
 
-  const html = `
-  <div style="font-family:'Arial',sans-serif;padding:0;background:#fff;width:640px;color:#1a1209;">
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Расчётный листок — ${d.name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <div style="background:#1a1209;color:#f5efe0;padding:12px 20px;text-align:center;">
-      <div style="font-size:10px;margin-bottom:2px;">ООО «ТехноСервис» · ИНН 5260000000</div>
-      <div style="font-size:17px;font-weight:bold;margin-bottom:2px;">РАСЧЁТНЫЙ ЛИСТОК</div>
-      <div style="font-size:11px;margin-bottom:2px;">за ${d.monthLabel}</div>
-      <div style="font-size:9px;color:#b8973e;">Документ сформирован автоматически информационной системой</div>
-    </div>
-
-    <div style="background:#f5efe0;border:1px solid #b8973e;padding:8px 14px;margin:8px;display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>
-        <div style="font-size:9px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:2px;">СОТРУДНИК</div>
-        <div style="font-size:13px;font-weight:bold;margin-bottom:2px;">${d.name}</div>
-        <div style="font-size:11px;color:#5a4a35;">Должность: ${d.position}</div>
-        <div style="font-size:11px;color:#5a4a35;">Подразделение: ${d.dept}</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:9px;font-weight:bold;letter-spacing:2px;color:#8a6e28;margin-bottom:2px;">ТАБ. №</div>
-        <div style="font-size:17px;font-weight:bold;">${d.tabnum}</div>
-        <div style="font-size:11px;color:#5a4a35;margin-top:4px;">Оклад: ${rub(d.salary)} руб.</div>
-      </div>
-    </div>
-
-    <div style="margin:0 8px 7px;">
-      <div style="background:#1a1209;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">НАЧИСЛЕНИЯ</div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead>
-          <tr style="background:#3c2d0f;color:#f5efe0;font-size:9px;">
-            <th style="padding:4px 8px;border:1px solid #b8973e;text-align:left;">Вид начисления</th>
-            <th style="padding:4px 8px;border:1px solid #b8973e;">Дней</th>
-            <th style="padding:4px 8px;border:1px solid #b8973e;">Ставка</th>
-            <th style="padding:4px 8px;border:1px solid #b8973e;text-align:right;">Сумма, руб.</th>
-          </tr>
-        </thead>
-        <tbody>${accrualRows}</tbody>
-      </table>
-      <div style="background:#b8973e;padding:5px 8px;display:flex;justify-content:space-between;font-weight:bold;font-size:12px;">
-        <span>ИТОГО НАЧИСЛЕНО:</span>
-        <span>${rub(d.gross)} руб.</span>
-      </div>
-    </div>
-
-    <div style="margin:0 8px 7px;">
-      <div style="background:#501e0a;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">УДЕРЖАНИЯ</div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead>
-          <tr style="background:#7a3015;color:#f5efe0;font-size:9px;">
-            <th style="padding:4px 8px;border:1px solid #c0704a;text-align:left;">Вид удержания</th>
-            <th style="padding:4px 8px;border:1px solid #c0704a;">База, руб.</th>
-            <th style="padding:4px 8px;border:1px solid #c0704a;">Ставка</th>
-            <th style="padding:4px 8px;border:1px solid #c0704a;text-align:right;">Сумма, руб.</th>
-          </tr>
-        </thead>
-        <tbody>${deductRows}</tbody>
-      </table>
-      <div style="background:#b05030;color:#fff;padding:5px 8px;display:flex;justify-content:space-between;font-weight:bold;font-size:12px;">
-        <span>ИТОГО УДЕРЖАНО:</span>
-        <span>${rub(d.ndfl)} руб.</span>
-      </div>
-    </div>
-
-    <div style="margin:0 8px 7px;">
-      <div style="background:#1e3250;color:#f5efe0;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:1px;">СТРАХОВЫЕ ВЗНОСЫ (начисляет работодатель)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <tbody>
-          <tr style="background:#f0f4fd;">
-            <td style="padding:4px 8px;border:1px solid #c0cce0;">Пенсионный фонд РФ (22%)</td>
-            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.pfr)} руб.</td>
-          </tr>
-          <tr>
-            <td style="padding:4px 8px;border:1px solid #c0cce0;">ФОМС — медицинское страхование (5,1%)</td>
-            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.foms)} руб.</td>
-          </tr>
-          <tr style="background:#f0f4fd;">
-            <td style="padding:4px 8px;border:1px solid #c0cce0;">ФСС — социальное страхование (2,9%)</td>
-            <td style="padding:4px 8px;border:1px solid #c0cce0;text-align:right;font-weight:bold;">${rub(d.fss)} руб.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div style="background:#1a1209;margin:0 8px 8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#f5efe0;font-size:14px;font-weight:bold;letter-spacing:1px;">К ВЫПЛАТЕ:</span>
-      <span style="color:#b8973e;font-size:19px;font-weight:bold;">${rub(d.net)} руб.</span>
-    </div>
-
-    <div style="margin:0 8px 10px;padding:7px 0 0;border-top:1px solid #b8973e;font-size:9px;color:#5a4a35;display:flex;justify-content:space-between;align-items:flex-end;">
-      <div>
-        <div style="margin-bottom:2px;">Расчётный листок выдан на основании ст. 136 ТК РФ.</div>
-        <div>Дата формирования: ${today}</div>
-      </div>
-      <div style="border-top:1px solid #333;padding-top:3px;width:240px;text-align:center;font-size:10px;">Подпись главного бухгалтера</div>
-    </div>
-
-  </div>`;
-
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
-  wrapper.innerHTML = html;
-  document.body.appendChild(wrapper);
-
-  try {
-    const fileName = 'RaschetnyiList_' + d.name.split(' ')[0] + '_' + d.monthLabel.replace(' ', '_') + '.pdf';
-    await renderHtmlToPdf(wrapper.firstElementChild, 'portrait', fileName);
-  } finally {
-    document.body.removeChild(wrapper);
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
   }
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    color: #1a1209;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .payslip {
+    width: 100%;
+    max-width: 190mm;
+    margin: 0 auto;
+  }
+
+  /* Шапка */
+  .header {
+    background: #1a1209;
+    color: #f5efe0;
+    padding: 10px 16px;
+    text-align: center;
+  }
+  .header .company { font-size: 9px; margin-bottom: 2px; }
+  .header .title   { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+  .header .period  { font-size: 10px; margin-bottom: 2px; }
+  .header .sub     { font-size: 8px; color: #b8973e; }
+
+  /* Сотрудник */
+  .employee-block {
+    background: #f5efe0;
+    border: 1px solid #b8973e;
+    padding: 7px 12px;
+    margin: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .emp-label { font-size: 8px; font-weight: bold; letter-spacing: 2px; color: #8a6e28; margin-bottom: 2px; }
+  .emp-name  { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+  .emp-info  { font-size: 10px; color: #5a4a35; }
+  .emp-tabnum { font-size: 16px; font-weight: bold; }
+
+  /* Секции */
+  .section-title {
+    padding: 4px 8px;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #f5efe0;
+    margin-top: 5px;
+  }
+  .s-accrual  { background: #1a1209; }
+  .s-deduct   { background: #501e0a; }
+  .s-insure   { background: #1e3250; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+  thead tr { font-size: 9px; }
+  .th-accrual { background: #3c2d0f; color: #f5efe0; }
+  .th-deduct  { background: #7a3015; color: #f5efe0; }
+
+  th, td {
+    padding: 4px 7px;
+    border: 1px solid #e0d5c0;
+  }
+  th { font-weight: normal; }
+
+  .border-gold td, .border-gold th { border-color: #b8973e; }
+  .border-red  td, .border-red  th { border-color: #c0704a; }
+  .border-blue td, .border-blue th { border-color: #c0cce0; }
+
+  .row-alt  { background: #fdf8f0; }
+  .row-blue { background: #f0f4fd; }
+
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: bold; }
+  .green  { color: #2c6b22; }
+
+  /* Итоги */
+  .total-bar {
+    padding: 5px 8px;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    font-size: 11px;
+  }
+  .total-accrual { background: #b8973e; color: #1a1209; }
+  .total-deduct  { background: #b05030; color: #fff; }
+
+  /* К выплате */
+  .net-bar {
+    background: #1a1209;
+    color: #f5efe0;
+    padding: 9px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+  }
+  .net-label  { font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+  .net-amount { font-size: 18px; font-weight: bold; color: #b8973e; }
+
+  /* Подвал */
+  .footer {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid #b8973e;
+    font-size: 8px;
+    color: #5a4a35;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .signature {
+    border-top: 1px solid #333;
+    padding-top: 3px;
+    width: 200px;
+    text-align: center;
+    font-size: 9px;
+  }
+
+  /* Страховые взносы — 2 колонки */
+  .insure-row td:first-child { width: 70%; }
+
+  @media print {
+    html, body { height: 100%; }
+    .payslip { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="payslip">
+
+  <div class="header">
+    <div class="company">ООО «ТехноСервис» · ИНН 5260000000</div>
+    <div class="title">РАСЧЁТНЫЙ ЛИСТОК</div>
+    <div class="period">за ${d.monthLabel}</div>
+    <div class="sub">Документ сформирован автоматически информационной системой</div>
+  </div>
+
+  <div class="employee-block">
+    <div>
+      <div class="emp-label">СОТРУДНИК</div>
+      <div class="emp-name">${d.name}</div>
+      <div class="emp-info">Должность: ${d.position}</div>
+      <div class="emp-info">Подразделение: ${d.dept}</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="emp-label">ТАБ. №</div>
+      <div class="emp-tabnum">${d.tabnum}</div>
+      <div class="emp-info" style="margin-top:3px;">Оклад: ${rub(d.salary)} руб.</div>
+    </div>
+  </div>
+
+  <div class="section-title s-accrual">НАЧИСЛЕНИЯ</div>
+  <table class="border-gold">
+    <thead>
+      <tr class="th-accrual">
+        <th style="text-align:left;">Вид начисления</th>
+        <th class="center">Дней</th>
+        <th class="center">Ставка</th>
+        <th class="right">Сумма, руб.</th>
+      </tr>
+    </thead>
+    <tbody>${accrualRows}</tbody>
+  </table>
+  <div class="total-bar total-accrual">
+    <span>ИТОГО НАЧИСЛЕНО:</span>
+    <span>${rub(d.gross)} руб.</span>
+  </div>
+
+  <div class="section-title s-deduct">УДЕРЖАНИЯ</div>
+  <table class="border-red">
+    <thead>
+      <tr class="th-deduct">
+        <th style="text-align:left;">Вид удержания</th>
+        <th class="center">База, руб.</th>
+        <th class="center">Ставка</th>
+        <th class="right">Сумма, руб.</th>
+      </tr>
+    </thead>
+    <tbody>${deductRows}</tbody>
+  </table>
+  <div class="total-bar total-deduct">
+    <span>ИТОГО УДЕРЖАНО:</span>
+    <span>${rub(d.ndfl)} руб.</span>
+  </div>
+
+  <div class="section-title s-insure">СТРАХОВЫЕ ВЗНОСЫ (начисляет работодатель)</div>
+  <table class="border-blue">
+    <tbody>
+      <tr class="row-blue insure-row">
+        <td>Пенсионный фонд РФ (22%)</td>
+        <td class="right bold">${rub(d.pfr)} руб.</td>
+      </tr>
+      <tr class="insure-row">
+        <td>ФОМС — медицинское страхование (5,1%)</td>
+        <td class="right bold">${rub(d.foms)} руб.</td>
+      </tr>
+      <tr class="row-blue insure-row">
+        <td>ФСС — социальное страхование (2,9%)</td>
+        <td class="right bold">${rub(d.fss)} руб.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="net-bar">
+    <span class="net-label">К ВЫПЛАТЕ:</span>
+    <span class="net-amount">${rub(d.net)} руб.</span>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div>Расчётный листок выдан на основании ст. 136 ТК РФ.</div>
+      <div style="margin-top:2px;">Дата формирования: ${today}</div>
+    </div>
+    <div class="signature">Подпись главного бухгалтера</div>
+  </div>
+
+</div>
+<script>
+  window.onload = function() {
+    window.print();
+  };
+<\/script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 /* ── INIT ── */
