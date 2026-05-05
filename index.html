@@ -838,6 +838,37 @@
         <button class="btn btn-primary" onclick="addEmployee()">Добавить запись</button>
         <button class="btn" onclick="loadEmployees()">Обновить список</button>
       </div>
+      <!-- ДОКУМЕНТЫ -->
+      <div style="background:rgba(184,151,62,0.08); border:1px solid var(--divider); padding:32px; margin-top:32px;">
+        <h3 style="color:var(--gold-lt); margin-bottom:8px;">Сформировать документы</h3>
+        <p style="color:var(--warm-gray); font-size:14px; margin-bottom:20px;">Выберите сотрудника и период — документ скачается автоматически.</p>
+        <div class="form-row" style="margin-bottom:20px;">
+          <div class="field">
+            <label style="color:var(--gold-dk)">Сотрудник</label>
+            <select id="doc-employee"></select>
+          </div>
+          <div class="field">
+            <label style="color:var(--gold-dk)">Месяц</label>
+            <select id="doc-month">
+              <option value="1">Январь</option><option value="2">Февраль</option>
+              <option value="3">Март</option><option value="4">Апрель</option>
+              <option value="5">Май</option><option value="6">Июнь</option>
+              <option value="7">Июль</option><option value="8">Август</option>
+              <option value="9">Сентябрь</option><option value="10">Октябрь</option>
+              <option value="11">Ноябрь</option><option value="12">Декабрь</option>
+            </select>
+          </div>
+          <div class="field">
+            <label style="color:var(--gold-dk)">Год</label>
+            <input type="number" id="doc-year" value="2025" min="2020" max="2030">
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="createTimesheet()">Создать Табель</button>
+          <button class="btn" onclick="createPayslip()">Создать Расчётный лист</button>
+        </div>
+        <div id="doc-status" style="margin-top:16px; font-family:Cinzel,serif; font-size:10px; letter-spacing:2px; color:var(--gold-lt);"></div>
+      </div>
     </div>
   </div>
 
