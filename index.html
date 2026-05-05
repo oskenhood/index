@@ -7,8 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -931,26 +930,20 @@
 /* ── SUPABASE CONFIG ── */
 const SUPABASE_URL = 'https://zeytwxrugoketlirwbtw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao';
-
 let supabaseClient = null;
 
+/* ── ИНИЦИАЛИЗАЦИЯ SUPABASE ── */
 async function initSupabase() {
   try {
     supabaseClient = supabase.createClient('https://zeytwxrugoketlirwbtw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpleXR3eHJ1Z29rZXRsaXJ3YnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzM3OTIsImV4cCI6MjA5MzQ0OTc5Mn0.wC44xic7exrW-VHCOihVBy7yn1KZTgLRGBSzwt0CGao');
     const { data, error } = await supabaseClient.from('employees').select('id').limit(1);
-    if (error) {
-      console.error('Supabase error:', error);
-      setStatus('✕ Ошибка БД: ' + error.message, 'err');
-      renderMockData();
-      loadEmployeesForDocs();
-      return;
-    }
+    if (error) throw error;
     setStatus('✦ Соединение установлено', 'ok');
     loadEmployees();
     loadEmployeesForDocs();
   } catch(e) {
-    console.error('Supabase init error:', e);
-    setStatus('✕ Ошибка подключения: ' + e.message, 'err');
+    console.error('Supabase error:', e);
+    setStatus('✕ Работа в демо-режиме', 'err');
     renderMockData();
     loadEmployeesForDocs();
   }
@@ -958,25 +951,29 @@ async function initSupabase() {
 
 function setStatus(msg, type) {
   const el = document.getElementById('db-status');
-  el.textContent = msg;
-  el.className = 'status-' + type;
+  if (el) { el.textContent = msg; el.className = 'status-' + type; }
 }
 
+/* ── МОК-ДАННЫЕ ── */
 const MOCK = [
-  { full_name:'Морозов Алексей Сергеевич', position:'Главный инженер', department:'Производственный отдел', salary:95000, years_exp:8 },
-  { full_name:'Кузнецова Ирина Павловна', position:'Главный бухгалтер', department:'Бухгалтерия', salary:85000, years_exp:6 },
-  { full_name:'Лебедев Дмитрий Вячеславович', position:'Инженер-механик', department:'Производственный отдел', salary:68000, years_exp:4 },
-  { full_name:'Соловьёва Наталья Андреевна', position:'HR-специалист', department:'Отдел кадров', salary:55000, years_exp:3 },
-  { full_name:'Попов Игорь Геннадьевич', position:'Электрик', department:'Производственный отдел', salary:62000, years_exp:5 },
+  { id:'0', full_name:'Морозов Алексей Сергеевич',    position:'Главный инженер',    department:'Производственный отдел', salary:95000, years_exp:8, tax_children:2 },
+  { id:'1', full_name:'Кузнецова Ирина Павловна',     position:'Главный бухгалтер',  department:'Бухгалтерия',            salary:85000, years_exp:6, tax_children:1 },
+  { id:'2', full_name:'Лебедев Дмитрий Вячеславович', position:'Инженер-механик',    department:'Производственный отдел', salary:68000, years_exp:4, tax_children:0 },
+  { id:'3', full_name:'Соловьёва Наталья Андреевна',  position:'HR-специалист',      department:'Отдел кадров',           salary:55000, years_exp:3, tax_children:2 },
+  { id:'4', full_name:'Попов Игорь Геннадьевич',      position:'Электрик',           department:'Производственный отдел', salary:62000, years_exp:5, tax_children:1 },
+  { id:'5', full_name:'Захарова Елена Михайловна',    position:'Менеджер по продажам',department:'Отдел продаж',          salary:58000, years_exp:2, tax_children:0 },
+  { id:'6', full_name:'Тихонов Артём Владимирович',   position:'Специалист по АСУ',  department:'Производственный отдел', salary:72000, years_exp:3, tax_children:1 },
+  { id:'7', full_name:'Белова Ольга Николаевна',      position:'Бухгалтер',          department:'Бухгалтерия',            salary:48000, years_exp:4, tax_children:3 },
 ];
 
 function renderMockData() { renderEmployees(MOCK); }
 
 function renderEmployees(data) {
   const list = document.getElementById('emp-list');
+  if (!list) return;
   const header = list.querySelector('.emp-row.header');
   list.innerHTML = '';
-  list.appendChild(header);
+  if (header) list.appendChild(header);
   if (!data || data.length === 0) {
     const empty = document.createElement('div');
     empty.style = 'padding:20px;color:var(--warm-gray);font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;';
@@ -984,16 +981,15 @@ function renderEmployees(data) {
     list.appendChild(empty);
     return;
   }
-  data.forEach(emp => {
+  data.forEach(function(emp) {
     const row = document.createElement('div');
     row.className = 'emp-row';
-    row.innerHTML = `
-      <div class="emp-cell">${emp.full_name}</div>
-      <div class="emp-cell">${emp.position}</div>
-      <div class="emp-cell">${emp.department}</div>
-      <div class="emp-cell">${Number(emp.salary).toLocaleString('ru-RU')}</div>
-      <div class="emp-cell">${emp.years_exp || '—'} лет</div>
-    `;
+    row.innerHTML =
+      '<div class="emp-cell">' + emp.full_name + '</div>' +
+      '<div class="emp-cell">' + emp.position + '</div>' +
+      '<div class="emp-cell">' + emp.department + '</div>' +
+      '<div class="emp-cell">' + Number(emp.salary).toLocaleString('ru-RU') + '</div>' +
+      '<div class="emp-cell">' + (emp.years_exp || '—') + ' лет</div>';
     list.appendChild(row);
   });
 }
@@ -1012,10 +1008,7 @@ async function addEmployee() {
   const dept = document.getElementById('emp-dept').value;
   const sal  = parseInt(document.getElementById('emp-salary').value);
   if (!name || !pos || !sal) { alert('Заполните все поля'); return; }
-  if (!supabaseClient) {
-    MOCK.push({ full_name:name, position:pos, department:dept, salary:sal, years_exp:0 });
-    renderMockData(); return;
-  }
+  if (!supabaseClient) { MOCK.push({ id: String(MOCK.length), full_name:name, position:pos, department:dept, salary:sal, years_exp:0, tax_children:0 }); renderMockData(); return; }
   const { error } = await supabaseClient.from('employees').insert([{ full_name:name, position:pos, department:dept, salary:sal, years_exp:0 }]);
   if (error) { alert('Ошибка: ' + error.message); return; }
   document.getElementById('emp-name').value = '';
@@ -1024,19 +1017,19 @@ async function addEmployee() {
   loadEmployees();
 }
 
-/* ── CALCULATOR ── */
+/* ── КАЛЬКУЛЯТОР ── */
 function fmt(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
 
 function calculate() {
-  const salary    = +document.getElementById('salary').value;
-  const worked    = +document.getElementById('worked_days').value;
-  const workdays  = +document.getElementById('work_days').value;
-  const overtime  = +document.getElementById('overtime').value;
-  const night     = +document.getElementById('night').value;
-  const normHours = +document.getElementById('norm_hours').value;
-  const children  = +document.getElementById('children').value;
-  const bonusPct  = +document.getElementById('bonus_pct').value;
-  const holiday   = +document.getElementById('holiday').value;
+  const salary    = +document.getElementById('salary').value        || 0;
+  const worked    = +document.getElementById('worked_days').value   || 0;
+  const workdays  = +document.getElementById('work_days').value     || 1;
+  const overtime  = +document.getElementById('overtime').value      || 0;
+  const night     = +document.getElementById('night').value         || 0;
+  const normHours = +document.getElementById('norm_hours').value    || 168;
+  const children  = +document.getElementById('children').value      || 0;
+  const bonusPct  = +document.getElementById('bonus_pct').value     || 0;
+  const holiday   = +document.getElementById('holiday').value       || 0;
   const hourRate  = salary / normHours;
   const dailyRate = salary / workdays;
   const base      = dailyRate * worked;
@@ -1056,29 +1049,29 @@ function calculate() {
   document.getElementById('res-net').textContent   = fmt(net);
 }
 
-/* ── EFFICIENCY CHART ── */
+/* ── ГРАФИК ЭФФЕКТИВНОСТИ ── */
 const chartData = [
   { label:'Табельный учёт', before:16, after:4 },
-  { label:'Расчёт премий', before:12, after:3 },
-  { label:'Начисление ЗП', before:28, after:18 },
-  { label:'Компенсации', before:10, after:3 },
-  { label:'Удержания', before:8, after:2 },
-  { label:'Расч. листки', before:4, after:1 },
-  { label:'Отчётность', before:9, after:3 },
+  { label:'Расчёт премий',  before:12, after:3 },
+  { label:'Начисление ЗП',  before:28, after:18 },
+  { label:'Компенсации',    before:10, after:3 },
+  { label:'Удержания',      before:8,  after:2 },
+  { label:'Расч. листки',   before:4,  after:1 },
+  { label:'Отчётность',     before:9,  after:3 },
 ];
 
 function buildChart() {
-  const maxVal = Math.max(...chartData.map(d => d.before));
+  const maxVal = Math.max.apply(null, chartData.map(function(d){ return d.before; }));
   const bars   = document.getElementById('chart-bars');
   const labels = document.getElementById('chart-labels');
+  if (!bars || !labels) return;
   bars.innerHTML = ''; labels.innerHTML = '';
-  chartData.forEach(d => {
+  chartData.forEach(function(d) {
     const grp = document.createElement('div');
     grp.className = 'bar-group';
-    grp.innerHTML = `
-      <div class="bar bar-before" style="height:${d.before/maxVal*100}%" title="До: ${d.before} ч/мес"></div>
-      <div class="bar bar-after"  style="height:${d.after/maxVal*100}%"  title="После: ${d.after} ч/мес"></div>
-    `;
+    grp.innerHTML =
+      '<div class="bar bar-before" style="height:' + (d.before/maxVal*100) + '%" title="До: ' + d.before + ' ч/мес"></div>' +
+      '<div class="bar bar-after"  style="height:' + (d.after/maxVal*100)  + '%" title="После: ' + d.after + ' ч/мес"></div>';
     bars.appendChild(grp);
     const lbl = document.createElement('div');
     lbl.className = 'chart-label';
@@ -1087,18 +1080,19 @@ function buildChart() {
   });
 }
 
-/* ── ДОКУМЕНТЫ: ЗАГРУЗКА СОТРУДНИКОВ В СЕЛЕКТ ── */
+/* ── ЗАГРУЗКА СОТРУДНИКОВ В СЕЛЕКТ ДОКУМЕНТОВ ── */
 async function loadEmployeesForDocs() {
   let employees = [];
   if (supabaseClient) {
     const { data } = await supabaseClient.from('employees').select('id,full_name').order('full_name');
-    if (data) employees = data;
+    if (data && data.length > 0) employees = data;
+    else employees = MOCK;
   } else {
-    employees = MOCK.map((e, i) => ({ id: String(i), full_name: e.full_name }));
+    employees = MOCK;
   }
   const sel = document.getElementById('doc-employee');
   if (!sel) return;
-  sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
+  sel.innerHTML = employees.map(function(e){ return '<option value="' + e.id + '">' + e.full_name + '</option>'; }).join('');
 }
 
 function docStatus(msg) {
@@ -1106,10 +1100,23 @@ function docStatus(msg) {
   if (el) el.textContent = msg;
 }
 
+/* ══════════════════════════════════════════════════════════
+   ГЕНЕРАЦИЯ PDF ЧЕРЕЗ html2pdf
+   Кириллица работает — рендерится как изображение из HTML
+   ══════════════════════════════════════════════════════════ */
+
+function getPdfOptions(filename, orientation) {
+  return {
+    margin:       10,
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: orientation }
+  };
+}
+
 /* ── СОЗДАТЬ ТАБЕЛЬ (PDF) ── */
 async function createTimesheet() {
-  if (!window.jspdf) { alert('Библиотека jsPDF не загружена. Проверьте интернет-соединение.'); return; }
-
   const empId    = document.getElementById('doc-employee').value;
   const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
   const month    = +document.getElementById('doc-month').value;
@@ -1117,7 +1124,7 @@ async function createTimesheet() {
   const MONTHS   = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const monthName = MONTHS[month];
 
-  docStatus('Формирование табеля...');
+  docStatus('⟳ Формирование табеля...');
 
   let ts = null;
   if (supabaseClient) {
@@ -1128,78 +1135,105 @@ async function createTimesheet() {
 
   const worked   = ts ? ts.worked_days   : 21;
   const normDay  = ts ? ts.work_days     : 21;
-  const overtime = ts ? ts.overtime_hrs  : 0;
-  const night    = ts ? ts.night_hrs     : 0;
+  const overtime = ts ? Number(ts.overtime_hrs)  : 0;
+  const night    = ts ? Number(ts.night_hrs)     : 0;
   const sick     = ts ? ts.sick_days     : 0;
   const vacation = ts ? ts.vacation_days : 0;
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-  doc.autoTable({
-    startY: 8,
-    body: [['ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ'], ['Форма T-13  |  ООО ТехноСервис']],
-    styles: { halign: 'center', fontSize: 13, fontStyle: 'bold', fillColor: [255,255,255], textColor: [26,18,9] },
-    didParseCell: function(d) { if (d.row.index === 1) { d.cell.styles.fontSize = 9; d.cell.styles.fontStyle = 'normal'; } },
-    theme: 'plain',
-  });
-
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 2,
-    body: [['Сотрудник: ' + empName + '     Период: ' + monthName + ' ' + year + ' г.     Таб. номер: ' + empId.slice(0,8).toUpperCase()]],
-    styles: { fontSize: 9, fillColor: [255,255,255], textColor: [40,30,10] },
-    theme: 'plain',
-  });
-
-  var dayHeaders = ['Отметка'];
-  var dayMarks   = ['Я'];
-  for (var d = 1; d <= daysInMonth; d++) {
-    dayHeaders.push(String(d));
-    dayMarks.push('Я');
+  // Строим строку дней и отметок
+  let daysHtml = '';
+  let marksHtml = '';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month-1, d).getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+    const bg = isWeekend ? '#e8e0d0' : '#fff';
+    daysHtml  += '<td style="background:' + bg + ';font-weight:bold">' + d + '</td>';
+    marksHtml += '<td style="background:' + bg + '">' + (isWeekend ? 'В' : 'Я') + '</td>';
   }
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 2,
-    head: [dayHeaders],
-    body: [dayMarks],
-    styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 18, halign: 'left', fontStyle: 'bold' } },
-    theme: 'grid',
-  });
+  const html = `
+  <div style="font-family:Arial,sans-serif;font-size:11px;color:#000;padding:10px;width:1050px">
+    <h2 style="text-align:center;font-size:15px;margin:0 0 4px">ТАБЕЛЬ УЧЁТА РАБОЧЕГО ВРЕМЕНИ</h2>
+    <p style="text-align:center;font-size:10px;color:#555;margin:0 0 14px">Форма № Т-13 &nbsp;|&nbsp; ООО «ТехноСервис»</p>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [['Отработано дней', 'Норма дней', 'Сверхурочные ч', 'Ночные ч', 'Больничные дн', 'Отпуск дн']],
-    body: [[String(worked), String(normDay), String(overtime), String(night), String(sick), String(vacation)]],
-    styles: { fontSize: 9, halign: 'center' },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
-    theme: 'grid',
-  });
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr>
+        <td style="padding:4px 8px;color:#666;width:160px">Сотрудник:</td>
+        <td style="padding:4px 8px;font-weight:bold">${empName}</td>
+        <td style="padding:4px 8px;color:#666;width:80px">Период:</td>
+        <td style="padding:4px 8px;font-weight:bold">${monthName} ${year} г.</td>
+        <td style="padding:4px 8px;color:#666;width:120px">Табельный №:</td>
+        <td style="padding:4px 8px;font-weight:bold">${empId.slice(0,8).toUpperCase()}</td>
+      </tr>
+    </table>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4,
-    body: [['Я - явка   Б - больничный   ОТ - отпуск   В - выходной   СВ - сверхурочные']],
-    styles: { fontSize: 7, textColor: [120, 120, 120], fillColor: [255,255,255] },
-    theme: 'plain',
-  });
+    <p style="font-size:10px;font-weight:bold;margin:0 0 4px">Отметки за ${monthName} ${year}:</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:9px">
+      <thead>
+        <tr style="background:#1a1209;color:#fff">
+          <th style="padding:5px 4px;text-align:left;width:60px">Отметка</th>
+          ${daysHtml.replace(/(<td)/g, '<th').replace(/(<\/td>)/g, '</th>').replace(/style="/g, 'style="color:#fff;').replace(/background:#e8e0d0/g, 'background:#5a4a30').replace(/background:#fff/g, 'background:#1a1209')}
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="text-align:center">
+          <td style="padding:5px 4px;font-weight:bold;background:#f5f0e8;text-align:left;border:1px solid #ccc">Явка/Отсутствие</td>
+          ${marksHtml.split('').join('').replace(/<td/g, '<td style="border:1px solid #ccc;padding:4px 2px;text-align:center"').replace(/<td style="background:(#e8e0d0|#fff);border/g, (m,bg) => '<td style="background:'+bg+';border')}
+        </tr>
+      </tbody>
+    </table>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 3,
-    body: [['Ответственный: ______________________', 'Руководитель: ______________________', 'Кадры: ______________________']],
-    styles: { fontSize: 8, fillColor: [255,255,255], textColor: [40,30,10] },
-    theme: 'plain',
-  });
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px">
+      <thead>
+        <tr style="background:#1a1209;color:#fff;text-align:center">
+          <th style="padding:7px">Отработано дней</th>
+          <th style="padding:7px">Норма дней</th>
+          <th style="padding:7px">Сверхурочные, ч</th>
+          <th style="padding:7px">Ночные, ч</th>
+          <th style="padding:7px">Больничные, дн</th>
+          <th style="padding:7px">Отпуск, дн</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="text-align:center;font-weight:bold;background:#f9f6f0">
+          <td style="padding:8px;border:1px solid #ddd">${worked}</td>
+          <td style="padding:8px;border:1px solid #ddd">${normDay}</td>
+          <td style="padding:8px;border:1px solid #ddd">${overtime}</td>
+          <td style="padding:8px;border:1px solid #ddd">${night}</td>
+          <td style="padding:8px;border:1px solid #ddd">${sick}</td>
+          <td style="padding:8px;border:1px solid #ddd">${vacation}</td>
+        </tr>
+      </tbody>
+    </table>
 
-  doc.save('Tabel_' + empName.split(' ')[0] + '_' + month + '_' + year + '.pdf');
-  docStatus('Табель сформирован и скачан');
+    <p style="font-size:9px;color:#888;margin-bottom:20px">
+      Условные обозначения: Я — явка &nbsp; В — выходной &nbsp; Б — больничный &nbsp; ОТ — отпуск &nbsp; СВ — сверхурочные
+    </p>
+
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="padding:5px 12px 5px 0;border-top:1px solid #000;font-size:9px;color:#555">Ответственный за ведение табеля</td>
+        <td style="padding:5px 12px 5px 0;border-top:1px solid #000;font-size:9px;color:#555">Руководитель подразделения</td>
+        <td style="padding:5px 0;border-top:1px solid #000;font-size:9px;color:#555">Работник отдела кадров</td>
+      </tr>
+    </table>
+  </div>`;
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  await html2pdf().set(getPdfOptions(
+    'Tabel_' + empName.split(' ')[0] + '_' + monthName + '_' + year + '.pdf', 'landscape'
+  )).from(container).save();
+
+  document.body.removeChild(container);
+  docStatus('✦ Табель сформирован и скачан');
 }
 
 /* ── СОЗДАТЬ РАСЧЁТНЫЙ ЛИСТ (PDF) ── */
 async function createPayslip() {
-  if (!window.jspdf) { alert('Библиотека jsPDF не загружена. Проверьте интернет-соединение.'); return; }
-
   const empId    = document.getElementById('doc-employee').value;
   const empName  = document.getElementById('doc-employee').selectedOptions[0].text;
   const month    = +document.getElementById('doc-month').value;
@@ -1207,144 +1241,144 @@ async function createPayslip() {
   const MONTHS   = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const monthName = MONTHS[month];
 
-  docStatus('Формирование расчётного листа...');
+  docStatus('⟳ Формирование расчётного листа...');
 
-  var pr = null, emp = null;
+  let pr = null, emp = null;
   if (supabaseClient) {
     const results = await Promise.all([
       supabaseClient.from('payroll').select('*').eq('employee_id', empId).eq('period_year', year).eq('period_month', month).single(),
       supabaseClient.from('employees').select('*').eq('id', empId).single()
     ]);
-    pr = results[0].data;
+    pr  = results[0].data;
     emp = results[1].data;
+  } else {
+    emp = MOCK.find(function(m){ return m.id === empId; }) || MOCK[0];
   }
 
-  var salary    = (emp && emp.salary)           ? Number(emp.salary)            : 65000;
-  var base      = (pr  && pr.base_pay)          ? Number(pr.base_pay)           : salary;
-  var overtime  = (pr  && pr.overtime_pay)      ? Number(pr.overtime_pay)       : 0;
-  var night     = (pr  && pr.night_pay)         ? Number(pr.night_pay)          : 0;
-  var holiday   = (pr  && pr.holiday_pay)       ? Number(pr.holiday_pay)        : 0;
-  var bonus     = (pr  && pr.bonus)             ? Number(pr.bonus)              : 0;
-  var sick      = (pr  && pr.sick_pay)          ? Number(pr.sick_pay)           : 0;
-  var vacation  = (pr  && pr.vacation_pay)      ? Number(pr.vacation_pay)       : 0;
-  var gross     = (pr  && pr.gross_total)       ? Number(pr.gross_total)        : base;
-  var ndfl      = (pr  && pr.ndfl)              ? Number(pr.ndfl)               : Math.round(gross * 0.13);
-  var deduct    = (pr  && pr.other_deductions)  ? Number(pr.other_deductions)   : 0;
-  var net       = (pr  && pr.net_pay)           ? Number(pr.net_pay)            : (gross - ndfl - deduct);
-  var insurance = (pr  && pr.insurance_total)   ? Number(pr.insurance_total)    : Math.round(gross * 0.30);
-  var children  = (emp && emp.tax_children)     ? Number(emp.tax_children)      : 0;
-  var childDed  = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
+  const salary    = emp ? Number(emp.salary)           : 65000;
+  const base      = pr  ? Number(pr.base_pay)          : salary;
+  const overtime  = pr  ? Number(pr.overtime_pay)      : 0;
+  const night     = pr  ? Number(pr.night_pay)         : 0;
+  const holiday   = pr  ? Number(pr.holiday_pay)       : 0;
+  const bonus     = pr  ? Number(pr.bonus)             : 0;
+  const sick      = pr  ? Number(pr.sick_pay)          : 0;
+  const vacation  = pr  ? Number(pr.vacation_pay)      : 0;
+  const gross     = pr  ? Number(pr.gross_total)       : base;
+  const ndfl      = pr  ? Number(pr.ndfl)              : Math.round(gross * 0.13);
+  const deduct    = pr  ? Number(pr.other_deductions)  : 0;
+  const net       = pr  ? Number(pr.net_pay)           : (gross - ndfl - deduct);
+  const insurance = pr  ? Number(pr.insurance_total)   : Math.round(gross * 0.30);
+  const children  = emp ? Number(emp.tax_children)     : 0;
+  const childDed  = children === 0 ? 0 : children === 1 ? 1400 : children === 2 ? 2800 : 5800;
 
   function r(n) { return Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' руб.'; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  function accrualRow(label, amount) {
+    if (amount <= 0) return '';
+    return '<tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">' + label + '</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0;font-weight:bold">' + r(amount) + '</td></tr>';
+  }
 
-  doc.autoTable({
-    startY: 8,
-    body: [['РАСЧЁТНЫЙ ЛИСТ'], ['ООО ТехноСервис  |  ст. 136 ТК РФ']],
-    styles: { halign: 'center', fontSize: 14, fontStyle: 'bold', fillColor: [255,255,255], textColor: [26,18,9] },
-    didParseCell: function(d) { if (d.row.index === 1) { d.cell.styles.fontSize = 9; d.cell.styles.fontStyle = 'normal'; } },
-    theme: 'plain',
-  });
+  const html = `
+  <div style="font-family:Arial,sans-serif;font-size:11px;color:#1a1209;padding:10px;width:600px">
+    <h2 style="text-align:center;font-size:16px;margin:0 0 3px;letter-spacing:1px">РАСЧЁТНЫЙ ЛИСТ</h2>
+    <p style="text-align:center;font-size:9px;color:#888;margin:0 0 16px">ООО «ТехноСервис» &nbsp;|&nbsp; ст. 136 ТК РФ</p>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 3,
-    body: [
-      ['Сотрудник', empName],
-      ['Должность', emp ? emp.position : '—'],
-      ['Подразделение', emp ? emp.department : '—'],
-      ['Период', monthName + ' ' + year + ' г.'],
-      ['Оклад', r(salary)],
-    ],
-    styles: { fontSize: 10, fillColor: [255,255,255] },
-    columnStyles: { 0: { cellWidth: 50, textColor: [100,100,100] }, 1: { fontStyle: 'bold', textColor: [26,18,9] } },
-    theme: 'plain',
-  });
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px">
+      <tr><td style="padding:5px 0;color:#888;width:160px">Сотрудник:</td><td style="padding:5px 0;font-weight:bold">${empName}</td></tr>
+      <tr><td style="padding:5px 0;color:#888">Должность:</td><td style="padding:5px 0">${emp ? emp.position : '—'}</td></tr>
+      <tr><td style="padding:5px 0;color:#888">Подразделение:</td><td style="padding:5px 0">${emp ? emp.department : '—'}</td></tr>
+      <tr><td style="padding:5px 0;color:#888">Период:</td><td style="padding:5px 0;font-weight:bold">${monthName} ${year} г.</td></tr>
+      <tr><td style="padding:5px 0;color:#888">Оклад:</td><td style="padding:5px 0">${r(salary)}</td></tr>
+    </table>
 
-  var accruals = [['Оплата по окладу (базовая)', r(base)]];
-  if (overtime > 0) accruals.push(['Сверхурочные (ст. 152 ТК РФ)', r(overtime)]);
-  if (night    > 0) accruals.push(['Доплата за ночное время (ст. 154 ТК РФ)', r(night)]);
-  if (holiday  > 0) accruals.push(['Праздничные и выходные (ст. 153 ТК РФ)', r(holiday)]);
-  if (bonus    > 0) accruals.push(['Премия', r(bonus)]);
-  if (sick     > 0) accruals.push(['Пособие по нетрудоспособности', r(sick)]);
-  if (vacation > 0) accruals.push(['Отпускные', r(vacation)]);
-  accruals.push(['ИТОГО НАЧИСЛЕНО (gross)', r(gross)]);
+    <!-- НАЧИСЛЕНИЯ -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <thead>
+        <tr style="background:#1a1209;color:#fff">
+          <th style="padding:8px 10px;text-align:left">НАЧИСЛЕНИЯ</th>
+          <th style="padding:8px 10px;text-align:right">Сумма</th>
+        </tr>
+      </thead>
+      <tbody style="background:#fff">
+        ${accrualRow('Оплата по окладу (базовая)', base)}
+        ${accrualRow('Сверхурочные (ст. 152 ТК РФ)', overtime)}
+        ${accrualRow('Доплата за ночное время (ст. 154 ТК РФ)', night)}
+        ${accrualRow('Праздничные и выходные (ст. 153 ТК РФ)', holiday)}
+        ${accrualRow('Премия', bonus)}
+        ${accrualRow('Пособие по нетрудоспособности', sick)}
+        ${accrualRow('Отпускные', vacation)}
+        <tr style="background:#f5f0e8">
+          <td style="padding:8px 10px;font-weight:bold">ИТОГО НАЧИСЛЕНО (gross)</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:bold">${r(gross)}</td>
+        </tr>
+      </tbody>
+    </table>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [['НАЧИСЛЕНИЯ', 'Сумма']],
-    body: accruals,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
-    didParseCell: function(d) {
-      if (d.section === 'body' && d.row.index === accruals.length - 1) {
-        d.cell.styles.fontStyle = 'bold';
-        d.cell.styles.fillColor = [245, 240, 230];
-      }
-    },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
+    <!-- УДЕРЖАНИЯ -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <thead>
+        <tr style="background:#1a1209;color:#fff">
+          <th style="padding:8px 10px;text-align:left">УДЕРЖАНИЯ</th>
+          <th style="padding:8px 10px;text-align:right">Сумма</th>
+        </tr>
+      </thead>
+      <tbody style="background:#fff">
+        <tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">Стандартный вычет на детей (${children} реб.)</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0">${r(childDed)}</td></tr>
+        <tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">НДФЛ 13%</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0;font-weight:bold">${r(ndfl)}</td></tr>
+        ${deduct > 0 ? '<tr><td style="padding:7px 10px;border-bottom:1px solid #e8e0d0">Прочие удержания</td><td style="padding:7px 10px;text-align:right;border-bottom:1px solid #e8e0d0">' + r(deduct) + '</td></tr>' : ''}
+        <tr style="background:#f5f0e8">
+          <td style="padding:8px 10px;font-weight:bold">ИТОГО УДЕРЖАНО</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:bold">${r(ndfl + deduct)}</td>
+        </tr>
+      </tbody>
+    </table>
 
-  var deductions = [
-    ['Стандартный вычет на детей (' + children + ' реб.)', r(childDed)],
-    ['НДФЛ 13%', r(ndfl)],
-  ];
-  if (deduct > 0) deductions.push(['Прочие удержания', r(deduct)]);
-  deductions.push(['ИТОГО УДЕРЖАНО', r(ndfl + deduct)]);
+    <!-- К ВЫПЛАТЕ -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr style="background:#1a1209;color:#f5d77a">
+        <td style="padding:12px 10px;font-size:14px;font-weight:bold;letter-spacing:1px">К ВЫПЛАТЕ (net)</td>
+        <td style="padding:12px 10px;font-size:14px;font-weight:bold;text-align:right">${r(net)}</td>
+      </tr>
+    </table>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [['УДЕРЖАНИЯ', 'Сумма']],
-    body: deductions,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [40, 30, 10], textColor: [255, 255, 255] },
-    didParseCell: function(d) {
-      if (d.section === 'body' && d.row.index === deductions.length - 1) {
-        d.cell.styles.fontStyle = 'bold';
-        d.cell.styles.fillColor = [245, 240, 230];
-      }
-    },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
+    <!-- СТРАХОВЫЕ ВЗНОСЫ -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <thead>
+        <tr style="background:#5a4a30;color:#fff">
+          <th style="padding:7px 10px;text-align:left">СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)</th>
+          <th style="padding:7px 10px;text-align:right">Сумма</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#faf7f2">
+          <td style="padding:7px 10px">Взносы 30% (ОПС, ОМС, ОСС)</td>
+          <td style="padding:7px 10px;text-align:right">${r(insurance)}</td>
+        </tr>
+      </tbody>
+    </table>
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 5,
-    body: [['К ВЫПЛАТЕ (net)', r(net)]],
-    styles: { fontSize: 13, fontStyle: 'bold', fillColor: [26, 18, 9], textColor: [255, 255, 255], cellPadding: 5 },
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-    theme: 'plain',
-  });
+    <p style="font-size:8px;color:#aaa;text-align:center;margin-top:10px">
+      Сформировано: ${new Date().toLocaleDateString('ru-RU')} &nbsp;|&nbsp; ИС Учёта Труда &nbsp;|&nbsp; ООО «ТехноСервис»
+    </p>
+  </div>`;
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [['СТРАХОВЫЕ ВЗНОСЫ (расходы работодателя)', 'Сумма']],
-    body: [['Взносы 30% (ОПС, ОМС, ОСС)', r(insurance)]],
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [80, 70, 50], textColor: [255, 255, 255] },
-    theme: 'striped',
-    columnStyles: { 0: { cellWidth: 130 }, 1: { halign: 'right', cellWidth: 50 } },
-  });
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 6,
-    body: [['Сформировано: ' + new Date().toLocaleDateString('ru-RU') + '  |  ИС Учёта Труда  |  ООО ТехноСервис']],
-    styles: { fontSize: 7, textColor: [150, 150, 150], halign: 'center', fillColor: [255,255,255] },
-    theme: 'plain',
-  });
+  await html2pdf().set(getPdfOptions(
+    'RaschetnyiList_' + empName.split(' ')[0] + '_' + monthName + '_' + year + '.pdf', 'portrait'
+  )).from(container).save();
 
-  doc.save('RaschetnyiList_' + empName.split(' ')[0] + '_' + month + '_' + year + '.pdf');
-  docStatus('Расчётный лист сформирован и скачан');
+  document.body.removeChild(container);
+  docStatus('✦ Расчётный лист сформирован и скачан');
 }
 
-/* ── INIT ── */
+/* ── ЗАПУСК ── */
 buildChart();
 calculate();
 document.querySelectorAll('#salary,#worked_days,#work_days,#overtime,#night,#norm_hours,#children,#bonus_pct,#holiday')
-  .forEach(function(el) { el.addEventListener('input', calculate); });
-
+  .forEach(function(el){ el.addEventListener('input', calculate); });
 initSupabase();
 </script>
 </body>
